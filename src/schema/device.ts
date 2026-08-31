@@ -72,6 +72,18 @@ export const Device = z
     ports: z.array(Port).default([]),
     /** 자체적으로 마이크로그리드 인터커넥트(계통 분리) 기능을 제공하는가. */
     provides_mid: z.boolean(),
+    /**
+     * 계통 기준 없이 전압·주파수를 스스로 세울 수 있는가(그리드 포밍).
+     * 아일랜드를 형성하는 주체를 가른다. null = 미확인 — 엔진은 "불가"로 취급하고
+     * finding을 남긴다. 추정으로 true를 넣지 않는다.
+     */
+    grid_forming: z.boolean().nullable().default(null),
+    /**
+     * 계통도 축전지 잔량도 없는 상태에서 PV만으로 기동할 수 있는가.
+     * grid_forming과 별개다 — 포밍은 되지만 블랙스타트는 안 되는 장비가 있다.
+     * null = 미확인.
+     */
+    black_start_capable: z.boolean().nullable().default(null),
     /** 동작에 반드시 동반되어야 하는 장비 후보군. 토폴로지에서 최소 1개 충족 필요. */
     requires_one_of: z.array(z.string()).default([]),
     needs_backup_subpanel: z.enum(["yes", "no", "conditional", "unknown"]).default("unknown"),
