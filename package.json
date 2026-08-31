@@ -1,0 +1,25 @@
+{
+  "name": "res-energy-twin",
+  "version": "0.1.0",
+  "description": "Residential solar + ESS configuration reference — Sprint 0: schema and data validation only",
+  "main": "index.js",
+  "scripts": {
+    "validate": "tsx scripts/validate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "yaml": "^2.9.0",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "type": "module"
+}

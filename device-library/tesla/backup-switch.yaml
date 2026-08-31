@@ -1,0 +1,25 @@
+id: tesla-backup-switch
+vendor: Tesla
+display_name: Backup Switch
+class: mid
+status: draft
+ratings:
+  service_a: null   # TODO: 지원 서비스 정격 확인
+ports:
+  - { id: grid_in, type: ac_service_line, direction: in }
+  - { id: load_out, type: ac_service_line, direction: out }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: true
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval:
+  required: true
+  status: unknown
+  note: "미터 소켓 뒤 설치. 유틸리티별 요건 확인 필요"
+sources:
+  - ref: "Tesla Backup Switch 제품 페이지 / 설치 매뉴얼"
+    date: null
+    note: "원문 대조 필요"
+todos:
+  - "정격 전류, 지원 서비스 유형(100/150/200A) 확인"

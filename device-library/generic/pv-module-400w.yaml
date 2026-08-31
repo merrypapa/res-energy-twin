@@ -1,0 +1,16 @@
+id: generic-pv-module-400w
+vendor: generic
+display_name: PV 모듈 (모델링용)
+class: pv_module
+status: draft
+ratings: {}
+ports:
+  - { id: dc_out, type: dc_pv_module, direction: out }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources: []
+todos:
+  - "Qcells 실제 모델로 교체 및 전기 정격 입력"

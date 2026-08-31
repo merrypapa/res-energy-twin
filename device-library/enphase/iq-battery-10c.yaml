@@ -1,0 +1,24 @@
+id: enphase-iq-battery-10c
+vendor: Enphase
+display_name: IQ Battery 10C
+class: ac_battery
+status: draft
+ratings:
+  usable_energy_kwh: 10
+  continuous_ac_kva: 7.08
+  lra: null   # TODO: 소프트스타트 조건부 값. 매뉴얼 확인
+ports:
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: false
+requires_one_of: [enphase-iq-meter-collar]
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Enphase 제품 페이지 / IQ Battery 10C 지원 문서"
+    date: "2026-08"
+    note: "부분/전체 백업 모두 IQ Meter Collar 필요"
+todos:
+  - "LRA 및 서지 정격 확인"
+  - "최대 확장 유닛 수 확인"

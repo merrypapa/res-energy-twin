@@ -1,0 +1,32 @@
+{
+  "id": "tesla-pw3-backup-switch-whole-home",
+  "vendor": "Tesla",
+  "display_name": "Powerwall 3 + Backup Switch — 전체 백업",
+  "status": "draft",
+  "backup_scope": "whole_home",
+  "nodes": [
+    { "ref": "svc", "device": "generic-utility-service-200a", "label": "유틸리티 서비스" },
+    { "ref": "bs", "device": "tesla-backup-switch", "label": "Backup Switch (미터 소켓)" },
+    { "ref": "msp", "device": "generic-msp-200a", "label": "메인 서비스 패널 200A" },
+    { "ref": "pw3", "device": "tesla-powerwall-3", "label": "Powerwall 3" },
+    { "ref": "pv", "device": "generic-pv-module-400w", "label": "PV 어레이", "count": 20 }
+  ],
+  "edges": [
+    { "from": "svc.line", "to": "bs.grid_in", "layer": "power",
+      "conductor": { "awg": null, "ocpd_a": 200, "note": "서비스 도체. AWG는 사이트 조건" } },
+    { "from": "bs.load_out", "to": "msp.main_lugs", "layer": "power",
+      "conductor": { "ocpd_a": 200, "note": "MID 하류 — 정전 시 전체 부하가 아일랜드에 포함" } },
+    { "from": "pw3.ac_out", "to": "msp.branch", "layer": "power",
+      "conductor": { "ocpd_a": 60, "note": "부하측 인터커넥션. 버스바 정격 대비 검토 필요" } },
+    { "from": "pv.dc_out", "to": "pw3.pv_dc", "layer": "power",
+      "conductor": { "note": "DC 결합 — 스트링이 PW3 내부 MPPT로 직결" } },
+    { "from": "pw3.comms_local", "to": "bs.comms", "layer": "comms", "conductor": null }
+  ],
+  "sources": [
+    { "ref": "Tesla Powerwall 3 설치 매뉴얼 결선도", "date": null, "note": "원문 대조 필요" }
+  ],
+  "todos": [
+    "PV 스트링 구성(모듈 수/스트링 수)을 별도 필드로 모델링할지 결정",
+    "Backup Switch의 CT 배선을 comms 레이어로 표현할지 ct_sense 포트로 분리할지 결정"
+  ]
+}

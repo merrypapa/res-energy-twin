@@ -1,0 +1,19 @@
+id: generic-utility-service-200a
+vendor: generic
+display_name: 유틸리티 서비스 200A (단상 3선 240V)
+class: service_point
+status: verified
+ratings:
+  service_a: 200
+ports:
+  - { id: line, type: ac_service_line, direction: out }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "모델링 기준값 (특정 제품 아님)"
+    date: null
+    note: null
+todos: []

@@ -1,0 +1,17 @@
+id: enphase-iq8-microinverter
+vendor: Enphase
+display_name: IQ8 계열 마이크로인버터
+class: microinverter
+status: draft
+ratings: {}
+ports:
+  - { id: dc_in, type: dc_pv_module, direction: in }
+  - { id: ac_out, type: ac_240v_split, direction: out }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources: []
+todos:
+  - "스텁 파일. 모델별(IQ8+/8M/8A 등) 정격 분리 필요"

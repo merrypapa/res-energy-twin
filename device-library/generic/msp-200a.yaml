@@ -1,0 +1,21 @@
+id: generic-msp-200a
+vendor: generic
+display_name: 메인 서비스 패널 200A
+class: main_panel
+status: verified
+ratings:
+  busbar_a: 200
+  main_ocpd_a: 200
+ports:
+  - { id: main_lugs, type: ac_service_line, direction: in }
+  - { id: branch, type: ac_240v_split, direction: bidirectional, max_connections: 40 }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "모델링 기준값 (특정 제품 아님)"
+    date: null
+    note: "버스바 200A / 메인 200A 가정"
+todos: []

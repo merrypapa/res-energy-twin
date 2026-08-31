@@ -1,0 +1,29 @@
+id: tesla-powerwall-3
+vendor: Tesla
+display_name: Powerwall 3
+class: hybrid_inverter_battery
+status: draft
+ratings:
+  usable_energy_kwh: 13.5
+  continuous_ac_kw: 11.5
+  lra: 185
+  pv_mppt_count: 6
+  max_pv_dc_kw: null   # TODO: 데이터시트 rev 확인
+ports:
+  - { id: pv_dc, type: dc_string, direction: in, max_connections: 6 }
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional, ocpd_a: 60 }
+  - { id: comms, type: comms_ethernet, direction: bidirectional }
+  - { id: comms_local, type: comms_proprietary, direction: bidirectional }   # Backup Switch/Gateway 연결
+provides_mid: false
+requires_one_of: [tesla-backup-switch, tesla-gateway-3]
+needs_backup_subpanel: conditional
+certifications: [UL9540, UL1741-SB]
+utility_approval: null
+sources:
+  - ref: "Tesla Powerwall 3 datasheet / installation manual"
+    date: null
+    note: "rev 및 취득일 미기재 — 사내 배포 전 원문 대조 필요"
+todos:
+  - "ac_out ocpd_a 60A는 11.5kW/240V 연속전류 기준 산출값. 매뉴얼 명시값과 대조 필요"
+  - "max_pv_dc_kw 확인"
+  - "comms_local 실제 매체(유선 RS485/무선) 확인 — 현재 proprietary로 임시 분류"
