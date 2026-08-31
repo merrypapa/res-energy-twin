@@ -195,7 +195,7 @@ export function evaluateScenario(
     open.add(ref);
   }
   if (scenario.grid === "absent") {
-    for (const n of graph.nodes) if (n.device.provides_mid) open.add(n.ref);
+    for (const n of graph.nodes) if (n.device.provides_mid === true) open.add(n.ref);
   }
   if (scenario.requires_trip_target && requested.length === 0) {
     findings.push({
@@ -283,6 +283,14 @@ function diagnose(
 
   if (sc.grid === "absent") {
     for (const n of graph.nodes) {
+      if (n.device.provides_mid === null) {
+        out.push({
+          severity: "warning",
+          code: "S023",
+          message: `${n.device.id}: provides_mid 미확인 — 계통 분리 주체로 쓰지 않았다. 아일랜드 경계가 실제와 다를 수 있다`,
+          where,
+        });
+      }
       if (!isInverter(n) || n.device.grid_forming !== null) continue;
       out.push({
         severity: "warning",

@@ -70,8 +70,12 @@ export const Device = z
     status: Status,
     ratings: Ratings.prefault({}),
     ports: z.array(Port).default([]),
-    /** 자체적으로 마이크로그리드 인터커넥트(계통 분리) 기능을 제공하는가. */
-    provides_mid: z.boolean(),
+    /**
+     * 자체적으로 마이크로그리드 인터커넥트(계통 분리) 기능을 제공하는가.
+     * null = 미확인. false("제공하지 않는다")와 다르다 — 엔진은 null을 개방 주체로
+     * 쓰지 않고 finding을 남긴다. 확인되지 않은 제품을 false로 단정하지 않는다.
+     */
+    provides_mid: z.boolean().nullable().default(null),
     /**
      * 계통 기준 없이 전압·주파수를 스스로 세울 수 있는가(그리드 포밍).
      * 아일랜드를 형성하는 주체를 가른다. null = 미확인 — 엔진은 "불가"로 취급하고

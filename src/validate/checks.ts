@@ -108,9 +108,19 @@ export function checkTopology(t: Topology, devices: Device[]): Finding[] {
 
   // 백업 구성인데 MID가 없다
   if (t.backup_scope !== "none") {
-    const hasMid = [...nodeDevice.values()].some((d) => d.provides_mid);
-    if (!hasMid) {
-      findings.push(warn("W030", `backup_scope=${t.backup_scope}이나 MID 제공 장치가 없음`, t.id));
+    const devs = [...nodeDevice.values()];
+    if (!devs.some((d) => d.provides_mid === true)) {
+      const unknown = devs.filter((d) => d.provides_mid === null);
+      findings.push(
+        unknown.length > 0
+          ? warn(
+              "W031",
+              `backup_scope=${t.backup_scope}이나 MID 제공 장치가 확정되지 않음 ` +
+                `(provides_mid 미확인: ${unknown.map((d) => d.id).join(", ")})`,
+              t.id,
+            )
+          : warn("W030", `backup_scope=${t.backup_scope}이나 MID 제공 장치가 없음`, t.id),
+      );
     }
   }
 
