@@ -1,0 +1,32 @@
+{
+  "id": "solaredge-dc-coupled-whole-home",
+  "vendor": "SolarEdge",
+  "display_name": "Nexis 계열 DC 결합 — 전체 백업 (골격)",
+  "status": "draft",
+  "backup_scope": "whole_home",
+  "nodes": [
+    { "ref": "svc", "device": "generic-utility-service-200a", "label": "유틸리티 서비스" },
+    { "ref": "mid", "device": "generic-mid-placeholder", "label": "MID (제품 미확정)" },
+    { "ref": "msp", "device": "generic-msp-200a", "label": "메인 서비스 패널 200A" },
+    { "ref": "inv", "device": "solaredge-nexis-hybrid", "label": "Nexis 하이브리드" },
+    { "ref": "pv", "device": "generic-pv-module-400w", "label": "PV 스트링", "count": 20 }
+  ],
+  "edges": [
+    { "from": "svc.line", "to": "mid.grid_in", "layer": "power", "conductor": { "ocpd_a": 200 } },
+    { "from": "mid.load_out", "to": "msp.main_lugs", "layer": "power", "conductor": { "ocpd_a": 200 } },
+    { "from": "inv.ac_out", "to": "msp.branch", "layer": "power", "conductor": { "ocpd_a": null } },
+    { "from": "pv.dc_out", "to": "inv.pv_dc", "layer": "power",
+      "conductor": { "note": "DC 결합 — 스트링이 인버터 MPPT로 직결" } },
+    { "from": "inv.comms", "to": "mid.comms", "layer": "comms", "conductor": null }
+  ],
+  "sources": [
+    { "ref": "CLAUDE.md §3.3 — 'SolarEdge(Nexis 계열): DC 결합, 스트링 구조'", "date": null,
+      "note": "이 골격은 위 한 줄에서만 도출됐다. 제품 문서 대조 전이다" }
+  ],
+  "todos": [
+    "전체 백업을 가정해 모델링했다. 실제 제품이 이 구성을 지원하는지 확인 후 backup_scope 확정",
+    "MID 자리표시자를 실제 제품으로 교체",
+    "백피드 OCPD 미기재 — 인버터 연속 출력 확인 후 산출",
+    "DC 결합 축전지를 별도 노드로 분리할지 결정"
+  ]
+}

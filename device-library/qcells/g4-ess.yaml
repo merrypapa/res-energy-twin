@@ -1,0 +1,25 @@
+id: qcells-g4-ess
+vendor: Qcells
+display_name: G4 ESS (사양 미확정)
+class: hybrid_inverter_battery
+status: draft
+ratings:
+  usable_energy_kwh: null      # TODO
+  continuous_ac_kw: null       # TODO
+  lra: null                    # TODO
+  max_pv_dc_kw: null           # TODO
+ports:
+  - { id: pv_dc, type: dc_string, direction: in }
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: null
+grid_forming: null
+black_start_capable: null
+requires_one_of: [qcells-g4-msc]
+needs_backup_subpanel: unknown
+certifications: []
+utility_approval: null
+sources: []
+todos:
+  - "스텁 파일. 내부 사양 기준으로 채워야 한다 — 확인 전까지 전 수치 null 유지"
+  - "MSC와의 역할 분담(계량·결합·계통 분리 중 무엇을 MSC가 맡는지) 확인"

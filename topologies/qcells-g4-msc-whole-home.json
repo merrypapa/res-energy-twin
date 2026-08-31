@@ -1,0 +1,30 @@
+{
+  "id": "qcells-g4-msc-whole-home",
+  "vendor": "Qcells",
+  "display_name": "G4 ESS + MSC — 전체 백업 (골격)",
+  "status": "draft",
+  "backup_scope": "whole_home",
+  "nodes": [
+    { "ref": "svc", "device": "generic-utility-service-200a", "label": "유틸리티 서비스" },
+    { "ref": "msc", "device": "qcells-g4-msc", "label": "G4 MSC (역할 미확정)" },
+    { "ref": "msp", "device": "generic-msp-200a", "label": "메인 서비스 패널 200A" },
+    { "ref": "ess", "device": "qcells-g4-ess", "label": "G4 ESS" },
+    { "ref": "pv", "device": "generic-pv-module-400w", "label": "PV 스트링", "count": 20 }
+  ],
+  "edges": [
+    { "from": "svc.line", "to": "msc.grid_in", "layer": "power", "conductor": { "ocpd_a": 200 } },
+    { "from": "msc.load_out", "to": "msp.main_lugs", "layer": "power", "conductor": { "ocpd_a": 200 } },
+    { "from": "ess.ac_out", "to": "msp.branch", "layer": "power", "conductor": { "ocpd_a": null } },
+    { "from": "pv.dc_out", "to": "ess.pv_dc", "layer": "power", "conductor": null },
+    { "from": "ess.comms", "to": "msc.comms", "layer": "comms", "conductor": null }
+  ],
+  "sources": [
+    { "ref": "CLAUDE.md §3.3 — 'Qcells G4 ESS (MSC/MID 구성). 내부 사양 기준'", "date": null,
+      "note": "이 골격은 위 한 줄에서만 도출됐다. 내부 사양 문서 대조 전이다" }
+  ],
+  "todos": [
+    "전체 백업을 가정해 모델링했다. 실제 구성 확인 후 backup_scope 확정",
+    "MSC의 역할이 확정되면 노드 구성이 바뀔 수 있다 (계량/결합이 분리될 가능성)",
+    "백피드 OCPD 미기재"
+  ]
+}

@@ -1,3 +1,4 @@
+import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadDevices, loadTopologies, validateAll, checkTopology, checkSourcedNumbers } from "../src/validate/index.js";
 import { Device } from "../src/schema/device.js";
@@ -13,7 +14,20 @@ describe("데이터 로드", () => {
   });
   it("모든 topology 파일이 스키마를 통과한다", () => {
     expect(topologies.findings.filter((f) => f.severity === "error")).toEqual([]);
-    expect(topologies.items.length).toBe(2);
+    // 개수를 상수로 박지 않는다. 데이터 파일 추가만으로 제품이 늘어나는 것이 이 프로젝트의 전제다.
+    // 지켜야 할 것은 "디렉터리의 파일이 하나도 조용히 누락되지 않는다"이다.
+    const files = readdirSync("topologies").filter((f) => f.endsWith(".json"));
+    expect(topologies.items.length).toBe(files.length);
+    expect(topologies.items.length).toBeGreaterThan(0);
+  });
+  it("모든 device 파일이 빠짐없이 로드된다", () => {
+    const count = (dir: string): number =>
+      readdirSync(dir, { withFileTypes: true }).reduce(
+        (n, e) =>
+          n + (e.isDirectory() ? count(`${dir}/${e.name}`) : /\.ya?ml$/.test(e.name) ? 1 : 0),
+        0,
+      );
+    expect(devices.items.length).toBe(count("device-library"));
   });
   it("전체 검증에 error가 없다", () => {
     const errors = validateAll(devices.items, topologies.items).filter((f) => f.severity === "error");

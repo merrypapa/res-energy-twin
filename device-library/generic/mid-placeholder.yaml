@@ -1,0 +1,19 @@
+id: generic-mid-placeholder
+vendor: generic
+display_name: MID (제품 미확정)
+class: mid
+status: draft
+ratings: {}
+ports:
+  - { id: grid_in, type: ac_service_line, direction: in }
+  - { id: load_out, type: ac_service_line, direction: out }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: null   # 어느 제품이 들어갈지 미정이므로 제공 여부를 단정하지 않는다
+requires_one_of: []
+needs_backup_subpanel: unknown
+certifications: []
+utility_approval: null
+sources: []
+todos:
+  - "실제 MID 제품으로 교체할 것. 이 파일은 토폴로지 골격을 세우기 위한 자리표시자다"
+  - "교체 시 provides_mid, needs_backup_subpanel, utility_approval을 함께 채운다"
