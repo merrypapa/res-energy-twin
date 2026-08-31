@@ -3,7 +3,11 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 4 완료 상태 — UI 없음.** 스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교표까지.
+**현재 스프린트 5 완료 — 전 스프린트 종료.**
+스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교 · 브라우저 앱 · Pages 배포.
+
+앱은 `npm run dev`. 렌더러 · 시나리오 · 룰 · 비교 엔진이 브라우저에서 그대로 돌고,
+UI 전용 로직은 없다. 상태는 URL 해시에 담기므로 링크를 그대로 공유할 수 있다.
 
 ```bash
 npm install
@@ -12,6 +16,8 @@ npm run render      # topologies/ → out/*.svg 단선도
 npm run render -- --scenario all   # 시나리오별 급전 상태를 반영한 도면
 npm run check       # 룰 엔진 — 코드 체크 Finding
 npm run compare     # 벤더별 구성 비교표 (최대 4종)
+npm run dev         # 브라우저 앱 (Vite)
+npm run build       # 데이터 번들 + 정적 빌드 → dist/
 npm test            # 검증기 + 렌더러 + 시나리오 · 룰 엔진 단위 테스트
 npm run typecheck
 ```
@@ -36,10 +42,12 @@ npm run typecheck
 | `src/scenario/` | (topology, scenario) → 급전 상태 + 흐름 방향 (순수 함수) |
 | `src/rules/` | 룰 실행 엔진 |
 | `src/compare/` | 벤더별 구성 비교 (순수 함수) |
+| `src/ui/` | React 앱 (3분할 · 비교 모드 · URL 상태) |
 | `scripts/validate.ts` | 검증 CLI |
 | `scripts/render.ts` | 렌더 CLI |
 | `scripts/check.ts` | 룰 CLI |
 | `scripts/compare.ts` | 비교 CLI |
+| `scripts/bundle.ts` | 데이터 → UI 번들 (검증 실패 시 빌드 중단) |
 
 ## 데이터 작성 규칙
 
@@ -90,10 +98,25 @@ npm run typecheck
 - 급전 상태는 렌더러가 계산하지 않는다. `energization` 인자로 주입받는다 —
   시나리오 엔진(`src/scenario/`)의 출력이 그대로 들어온다
 
-## 다음
+## 기여
 
-스프린트 4: 4종 확장(SolarEdge, Qcells) + 비교 모드. 동일 스키마로
-부품 수 · 서브패널 필요 여부 · 결선 포인트 수가 표로 자동 생성되어야 한다.
+`CONTRIBUTING.md` 참고. **데이터 파일만 고쳐서 제품과 구성을 추가할 수 있다** —
+코드를 건드려야 제품이 추가된다면 설계가 잘못된 것이니 이슈로 알려달라.
+CI가 데이터 PR에서도 전 파이프라인(검증 · 도면 · 룰 · 비교 · 빌드 · 테스트)을 다시 돌린다.
 
-**룰 출력은 아직 사내 배포용 근거가 아니다.** 조문 원문 대조 전까지 전 룰이
-`verified: false`이고, CLI가 매 실행 끝에 이를 알린다. 전기 엔지니어 리뷰 필요.
+## 배포
+
+`main` 푸시마다 GitHub Pages로 나간다 (`.github/workflows/pages.yml`).
+리포 설정에서 Pages를 켜야 동작한다 (Settings → Pages → Source: GitHub Actions).
+private 리포의 Pages는 유료 플랜이 필요하다.
+
+## 남은 것
+
+**이 도구의 출력은 아직 사내 배포용 근거가 아니다.**
+
+- 전 룰이 `verified: false` — NEC 조문 원문 대조 전이다. CLI와 UI가 매번 이를 알린다
+- SolarEdge · Qcells 는 골격이다. 수치 스펙이 전부 `null`
+- `black_start_capable` 전부 미확인, 일부 `grid_forming` · `provides_mid` 미확인
+- 부하(분기회로) 노드가 없어 `load_shed` 가 실제 차단을 계산하지 못한다
+
+사내 배포 전 전기 엔지니어 리뷰가 필요하다 (CLAUDE.md §5).

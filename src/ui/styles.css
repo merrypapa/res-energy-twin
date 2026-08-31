@@ -1,0 +1,186 @@
+/*
+ * CLAUDE.md §6: 전기 제도 도면의 어휘를 쓴다. SaaS 대시보드처럼 보이면 실패다.
+ * - 캔버스는 종이다. 카드에 담지 않는다 (그림자·둥근 모서리·테두리 없음)
+ * - 색은 도면 안에서만 정보를 나른다. UI 크롬은 잉크와 종이뿐이다
+ * - 모션은 사용자 액션에 대한 응답으로만. 로드 시 페이드인 없음
+ * - 타이포 1패밀리. 라벨 전체 대문자 없음. 모노스페이스는 식별자에만
+ */
+:root {
+  --paper: #f6f5f2;
+  --panel: #fbfaf8;
+  --ink: #1c1b19;
+  --ink-soft: #5c574f;
+  --dead: #c3beb3;
+  --rule: #d8d3c8;
+  --rule-strong: #b9b3a7;
+  --font: "Inter", "Helvetica Neue", Arial, "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button, select, input { font: inherit; color: inherit; }
+
+/* ── 뼈대 ───────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; height: 100%; }
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--rule-strong);
+  flex-wrap: wrap;
+}
+.masthead h1 { font-size: 15px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.masthead .sub { color: var(--ink-soft); font-size: 12px; }
+.masthead .spacer { flex: 1; }
+
+.columns {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr) 320px;
+  flex: 1;
+  min-height: 0;
+}
+
+.pane { overflow: auto; min-width: 0; }
+.pane.left { border-right: 1px solid var(--rule); background: var(--panel); }
+.pane.right { border-left: 1px solid var(--rule); background: var(--panel); }
+.pane.canvas { background: var(--paper); display: flex; flex-direction: column; }
+
+.pane h2 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  margin: 0;
+  padding: 12px 14px 6px;
+}
+
+.group { padding: 0 14px 14px; }
+.group + .group { border-top: 1px solid var(--rule); padding-top: 12px; }
+
+/* ── 구성 선택 ──────────────────────────────────────── */
+.choice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 7px 8px;
+  margin: 0 -8px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+.choice:hover { background: #f2f0eb; }
+.choice[data-on="true"] { border-left-color: var(--ink); background: #eeece6; }
+.choice input { margin: 3px 0 0; accent-color: var(--ink); }
+.choice .name { display: block; }
+.choice .meta { display: block; color: var(--ink-soft); font-size: 12px; }
+
+.toggle-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.toggle {
+  padding: 4px 10px;
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  cursor: pointer;
+  /* 상태 변화는 즉시. 로드 시 애니메이션은 없다 */
+  transition: background 80ms linear;
+}
+.toggle[data-on="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.field { display: block; margin-top: 8px; }
+.field span { display: block; font-size: 12px; color: var(--ink-soft); margin-bottom: 3px; }
+.field input, .field select {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+}
+
+/* ── 캔버스 ─────────────────────────────────────────── */
+.canvas-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--rule);
+  flex-wrap: wrap;
+}
+.canvas-bar .label { font-size: 12px; color: var(--ink-soft); }
+
+/* 차이 요약표가 자리를 넓혀도 도면이 읽을 수 없을 만큼 줄지 않게 바닥을 준다 */
+.sheets { flex: 1; min-height: 46vh; overflow: auto; padding: 16px; display: grid; gap: 16px 24px; }
+.sheets[data-n="1"] { grid-template-columns: 1fr; }
+.sheets[data-n="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheets[data-n="3"], .sheets[data-n="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* 도면은 카드가 아니다 — 종이 위에 직접 놓인다 */
+.sheet { min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.sheet > figcaption {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--rule);
+}
+/*
+ * 단선도는 한눈에 읽혀야 한다. 너비에 맞춰 늘리면 세로로 잘리므로
+ * 높이를 기준으로 맞추고 가로는 따라가게 둔다.
+ */
+.sheet > .paper { flex: 1; min-height: 0; display: flex; justify-content: center; }
+.sheet svg { display: block; height: auto; width: auto; max-width: 100%; max-height: 100%; }
+
+/* ── 검증 결과 ──────────────────────────────────────── */
+.finding {
+  padding: 8px 14px 8px 12px;
+  border-left: 3px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+/* 심각도는 색이 아니라 선 두께와 라벨로 구분한다 */
+.finding[data-sev="error"] { border-left-color: var(--ink); border-left-width: 6px; }
+.finding[data-sev="warning"] { border-left-color: var(--ink-soft); border-left-width: 4px; }
+.finding[data-sev="info"] { border-left-color: var(--rule-strong); }
+.finding .head { display: flex; gap: 8px; align-items: baseline; font-size: 12px; color: var(--ink-soft); }
+.finding .code { font-family: var(--mono); font-size: 11px; }
+.finding .msg { margin-top: 2px; }
+.finding .refs { margin-top: 3px; font-family: var(--mono); font-size: 11px; color: var(--ink-soft); }
+.finding .cite { margin-top: 3px; font-size: 11px; color: var(--ink-soft); }
+
+.empty { padding: 14px; color: var(--ink-soft); }
+
+/* ── 비교표 ─────────────────────────────────────────── */
+.diff { overflow-x: auto; border-top: 1px solid var(--rule-strong); }
+.diff table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.diff th, .diff td { text-align: left; padding: 5px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.diff th { font-weight: 600; color: var(--ink-soft); font-size: 12px; }
+.diff tr[data-differs="true"] th { color: var(--ink); }
+.diff tr[data-differs="true"] { background: #f1efe9; }
+
+.disclaimer {
+  padding: 8px 16px;
+  border-top: 1px solid var(--rule-strong);
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* ── 모바일: 현장에서 최소한 읽히기는 해야 한다 ────────── */
+@media (max-width: 900px) {
+  .columns { grid-template-columns: 1fr; }
+  .pane.left, .pane.right { border: none; border-bottom: 1px solid var(--rule-strong); max-height: 40vh; }
+  .sheets[data-n] { grid-template-columns: 1fr; }
+  /* 좁은 화면에서는 높이 제한을 풀고 스크롤로 읽는다 */
+  .sheets { min-height: 0; }
+  .sheet svg { max-height: none; width: 100%; }
+}

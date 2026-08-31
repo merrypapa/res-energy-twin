@@ -9,19 +9,29 @@
     "typecheck": "tsc --noEmit",
     "render": "tsx scripts/render.ts",
     "check": "tsx scripts/check.ts",
-    "compare": "tsx scripts/compare.ts"
+    "compare": "tsx scripts/compare.ts",
+    "bundle": "tsx scripts/bundle.ts",
+    "dev": "npm run bundle && vite",
+    "build": "npm run bundle && vite build",
+    "preview": "vite preview"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "yaml": "^2.9.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
+    "vite": "^8.2.2",
     "vitest": "^4.1.11"
   },
   "type": "module"
