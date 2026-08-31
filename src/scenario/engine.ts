@@ -33,7 +33,10 @@ export interface ScenarioResult {
   nodes: Readonly<Record<string, Energization>>;
   /** 개방된 노드 — 계통 부재 시 자동 개방된 MID + 지정 트립. */
   open_nodes: readonly string[];
-  /** AC를 실제로 낸 노드. 아일랜드를 세운 주체를 포함한다. */
+  /**
+   * AC를 실제로 낸 노드. "출력할 수 있다"가 아니라 "출력해서 도체를 살렸다"이다.
+   * 개방된 접점에 갇혀 아무것도 살리지 못한 장치는 여기 들어오지 않는다.
+   */
   injectors: readonly string[];
   findings: Finding[];
 }
@@ -54,6 +57,7 @@ const INVERTER_CLASSES = new Set([
 ]);
 
 type PortDomain = "ac" | "dc" | "other";
+type MidSide = "grid" | "load" | null;
 
 function portDomain(type: string): PortDomain {
   if (type.startsWith("ac_")) return "ac";
@@ -127,34 +131,45 @@ function propagate(
 
   const live = new Set<string>();
   const liveEdges = new Map<string, Flow>();
-  // 도착 포트 도메인. seed는 자체 출력이므로 도착 경로가 없다.
-  const queue: Array<{ ref: string; arrivedOn: PortDomain | null }> = [];
+  // 도착 포트의 도메인과 MID 측면. seed는 자체 출력이므로 도착 경로가 없다.
+  type Arrival = { on: PortDomain; side: MidSide } | null;
+  const queue: Array<{ ref: string; arrived: Arrival }> = [];
 
   for (const ref of seeds) {
     if (!graph.byRef.has(ref)) continue;
     live.add(ref);
-    queue.push({ ref, arrivedOn: null });
+    queue.push({ ref, arrived: null });
   }
 
   const visited = new Set<string>();
   while (queue.length > 0) {
     const cur = queue.shift()!;
-    const key = `${cur.ref}|${cur.arrivedOn ?? "-"}`;
+    const key = `${cur.ref}|${cur.arrived ? `${cur.arrived.on}/${cur.arrived.side}` : "-"}`;
     if (visited.has(key)) continue;
     visited.add(key);
 
-    if (open.has(cur.ref) && cur.arrivedOn !== null) continue; // 개방 노드는 통과 불가
+    const isOpen = open.has(cur.ref);
 
     for (const e of edgesByNode.get(cur.ref) ?? []) {
       const outgoing = e.from.nodeRef === cur.ref;
       const nearPort = outgoing ? e.from.port : e.to.port;
       const farEnd = outgoing ? e.to : e.from;
       const nearDomain = portDomain(nearPort.type);
+      const nearSide = nearPort.mid_side;
 
-      if (cur.arrivedOn !== null) {
+      if (isOpen) {
+        // 개방된 접점을 건너지 않는다. 접점 양쪽이 표기된 장치는 부하측만 살아난다.
+        if (cur.arrived === null) {
+          if (nearSide !== "load") continue; // 통합형 MID는 부하측으로만 출력한다
+        } else if (cur.arrived.side === null || nearSide === null || cur.arrived.side !== nearSide) {
+          continue;
+        }
+      }
+
+      if (cur.arrived !== null) {
         // 노드를 관통하는 경우에만 도메인 규칙을 적용한다.
-        if (cur.arrivedOn === "ac" && nearDomain === "dc") continue;
-        if (cur.arrivedOn === "dc" && nearDomain === "ac" && !injecting.has(cur.ref)) continue;
+        if (cur.arrived.on === "ac" && nearDomain === "dc") continue;
+        if (cur.arrived.on === "dc" && nearDomain === "ac" && !injecting.has(cur.ref)) continue;
       } else if (nearDomain !== injectionDomain(graph.byRef.get(cur.ref)!)) {
         // 시드는 자기가 내는 도메인으로만 나간다. 축전지가 야간에 DC측을 살리지 않는다.
         continue;
@@ -162,7 +177,10 @@ function propagate(
 
       if (!liveEdges.has(e.id)) liveEdges.set(e.id, outgoing ? "forward" : "reverse");
       if (!live.has(farEnd.nodeRef)) live.add(farEnd.nodeRef);
-      queue.push({ ref: farEnd.nodeRef, arrivedOn: portDomain(farEnd.port.type) });
+      queue.push({
+        ref: farEnd.nodeRef,
+        arrived: { on: portDomain(farEnd.port.type), side: farEnd.port.mid_side },
+      });
     }
   }
 
@@ -181,6 +199,8 @@ export function evaluateScenario(
 
   // ── 개방 지점 ──────────────────────────────────────────────
   const open = new Set<string>();
+  /** 지정 트립. 자동 개방된 MID와 달리 아무것도 내보내지 않는다. */
+  const tripped = new Set<string>();
   const requested = [...scenario.open_nodes, ...(opts.open ?? [])];
   for (const ref of requested) {
     if (!graph.byRef.has(ref)) {
@@ -193,6 +213,7 @@ export function evaluateScenario(
       continue;
     }
     open.add(ref);
+    tripped.add(ref);
   }
   if (scenario.grid === "absent") {
     for (const n of graph.nodes) if (n.device.provides_mid === true) open.add(n.ref);
@@ -209,7 +230,7 @@ export function evaluateScenario(
   // ── 급전 시작점 ────────────────────────────────────────────
   const seeds: string[] = [];
   for (const n of graph.nodes) {
-    if (open.has(n.ref)) continue; // 개방/트립된 장치는 아무것도 내보내지 않는다
+    if (tripped.has(n.ref)) continue; // 트립된 장치는 아무것도 내보내지 않는다
     if (n.device.class === "service_point" && scenario.grid === "present") seeds.push(n.ref);
     if (n.device.class === "pv_module" && scenario.pv === "producing") seeds.push(n.ref);
   }
@@ -217,7 +238,7 @@ export function evaluateScenario(
   // AC를 내는 노드. 계통이 있으면 추종 운전이 가능하고, 없으면 누군가 먼저 세워야 한다.
   const injecting = new Set<string>();
   for (const n of graph.nodes) {
-    if (!isInverter(n) || open.has(n.ref)) continue;
+    if (!isInverter(n) || tripped.has(n.ref)) continue;
     if (scenario.grid === "present" ? hasEnergy(n, scenario) : canFormIsland(n, scenario)) {
       injecting.add(n.ref);
       seeds.push(n.ref);
@@ -229,7 +250,7 @@ export function evaluateScenario(
   for (let guard = 0; guard < graph.nodes.length + 1; guard++) {
     let changed = false;
     for (const n of graph.nodes) {
-      if (injecting.has(n.ref) || open.has(n.ref) || !isInverter(n) || !hasEnergy(n, scenario)) continue;
+      if (injecting.has(n.ref) || tripped.has(n.ref) || !isInverter(n) || !hasEnergy(n, scenario)) continue;
       const acLive = graph.edges.some(
         (e) =>
           run.liveEdges.has(e.id) &&
@@ -257,8 +278,20 @@ export function evaluateScenario(
   const nodes: Record<string, Energization> = {};
   for (const n of graph.nodes) nodes[n.ref] = run.live.has(n.ref) ? "live" : "dead";
 
-  findings.push(...diagnose(graph, scenario, injecting, nodes, where));
 
+  // 출력 자격이 있어도 실제로 도체를 살리지 못했으면 주체가 아니다.
+  const effective = [...injecting]
+    .filter((ref) =>
+      graph.edges.some(
+        (e) =>
+          run.liveEdges.has(e.id) &&
+          ((e.from.nodeRef === ref && portDomain(e.from.port.type) === "ac") ||
+            (e.to.nodeRef === ref && portDomain(e.to.port.type) === "ac")),
+      ),
+    )
+    .sort();
+
+  findings.push(...diagnose(graph, scenario, effective, nodes, where));
   return {
     topology_id: topology.id,
     scenario_id: scenario.id,
@@ -266,7 +299,7 @@ export function evaluateScenario(
     flows,
     nodes,
     open_nodes: [...open].sort(),
-    injectors: [...injecting].sort(),
+    injectors: effective,
     findings,
   };
 }
@@ -275,7 +308,7 @@ export function evaluateScenario(
 function diagnose(
   graph: RenderGraph,
   sc: Scenario,
-  injecting: ReadonlySet<string>,
+  effectiveInjectors: readonly string[],
   nodes: Readonly<Record<string, Energization>>,
   where: string,
 ): Finding[] {
@@ -283,6 +316,20 @@ function diagnose(
 
   if (sc.grid === "absent") {
     for (const n of graph.nodes) {
+      if (
+        n.device.provides_mid === true &&
+        isInverter(n) &&
+        !n.device.ports.some((p) => p.mid_side !== null)
+      ) {
+        out.push({
+          severity: "warning",
+          code: "S024",
+          message:
+            `${n.device.id}: MID를 내장했으나 포트의 mid_side 표기가 없다 — ` +
+            `장치 내부의 아일랜드 경계를 그릴 수 없어 전체를 차단했다. 백업 결과가 실제보다 작다`,
+          where,
+        });
+      }
       if (n.device.provides_mid === null) {
         out.push({
           severity: "warning",
@@ -299,7 +346,7 @@ function diagnose(
         where,
       });
     }
-    if (injecting.size === 0) {
+    if (effectiveInjectors.length === 0) {
       out.push({
         severity: "warning",
         code: "S021",

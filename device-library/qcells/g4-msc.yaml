@@ -5,8 +5,8 @@ class: mid
 status: draft
 ratings: {}
 ports:
-  - { id: grid_in, type: ac_service_line, direction: in }
-  - { id: load_out, type: ac_service_line, direction: out }
+  - { id: grid_in, type: ac_service_line, direction: in, mid_side: grid }
+  - { id: load_out, type: ac_service_line, direction: out, mid_side: load }
   - { id: comms, type: comms_proprietary, direction: bidirectional }
 provides_mid: null
 requires_one_of: []

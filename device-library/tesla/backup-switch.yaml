@@ -6,8 +6,8 @@ status: draft
 ratings:
   service_a: null   # TODO: 지원 서비스 정격 확인
 ports:
-  - { id: grid_in, type: ac_service_line, direction: in }
-  - { id: load_out, type: ac_service_line, direction: out }
+  - { id: grid_in, type: ac_service_line, direction: in, mid_side: grid }
+  - { id: load_out, type: ac_service_line, direction: out, mid_side: load }
   - { id: comms, type: comms_proprietary, direction: bidirectional }
 provides_mid: true
 requires_one_of: []

@@ -8,7 +8,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "render": "tsx scripts/render.ts",
-    "check": "tsx scripts/check.ts"
+    "check": "tsx scripts/check.ts",
+    "compare": "tsx scripts/compare.ts"
   },
   "keywords": [],
   "author": "",

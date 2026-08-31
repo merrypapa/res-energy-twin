@@ -7,6 +7,7 @@ import { renderTopology } from "../src/render/index.js";
 import { buildRenderGraph } from "../src/graph/index.js";
 import { Scenario } from "../src/schema/scenario.js";
 import { Device } from "../src/schema/device.js";
+import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library").items;
 const topologies = loadTopologies("topologies").items;
@@ -235,6 +236,76 @@ describe("물리 규칙 — 모든 토폴로지 × 모든 시나리오", () => {
     for (const { t, s, r } of all) {
       expect(evaluateScenario(t, devices, s)).toEqual(r);
     }
+  });
+});
+
+describe("MID 내장 장치의 아일랜드 경계", () => {
+  const allInOne = (annotated: boolean) =>
+    Device.parse({
+      id: "vendor-z-allinone",
+      vendor: "VendorZ",
+      display_name: "올인원 ESS",
+      class: "hybrid_inverter_battery",
+      status: "draft",
+      ratings: { continuous_ac_kw: 9 },
+      ports: [
+        { id: "pv_dc", type: "dc_string", direction: "in" },
+        { id: "grid_in", type: "ac_service_line", direction: "in", ...(annotated ? { mid_side: "grid" } : {}) },
+        { id: "load_out", type: "ac_service_line", direction: "out", ...(annotated ? { mid_side: "load" } : {}) },
+      ],
+      provides_mid: true,
+      grid_forming: true,
+      needs_backup_subpanel: "no",
+      sources: [{ ref: "가상 제품", date: "2026-08", note: null }],
+    });
+
+  const topo = Topology.parse({
+    id: "all-in-one-fixture",
+    vendor: "VendorZ",
+    display_name: "올인원 — 전체 백업",
+    status: "draft",
+    backup_scope: "whole_home",
+    nodes: [
+      { ref: "svc", device: "generic-utility-service-200a" },
+      { ref: "unit", device: "vendor-z-allinone" },
+      { ref: "msp", device: "generic-msp-200a" },
+      { ref: "pv", device: "generic-pv-module-400w", count: 20 },
+    ],
+    edges: [
+      { from: "svc.line", to: "unit.grid_in", layer: "power" },
+      { from: "unit.load_out", to: "msp.main_lugs", layer: "power" },
+      { from: "pv.dc_out", to: "unit.pv_dc", layer: "power" },
+    ],
+  });
+
+  const evalWith = (annotated: boolean) =>
+    evaluateScenario(topo, [...devices, allInOne(annotated)], scen("outage_islanded"));
+
+  it("mid_side가 표기되면 계통측만 끊기고 부하측은 급전된다", () => {
+    const r = evalWith(true);
+    expect(r.energization["svc.line->unit.grid_in"]).toBe("dead");
+    expect(r.energization["unit.load_out->msp.main_lugs"]).toBe("live");
+    expect(r.injectors).toEqual(["unit"]);
+  });
+
+  it("표기가 없으면 보수적으로 전체를 차단하고 그 이유를 남긴다", () => {
+    const r = evalWith(false);
+    expect(r.energization["unit.load_out->msp.main_lugs"]).toBe("dead");
+    expect(codes(r)).toContain("S024");
+  });
+
+  it("injectors는 출력 자격이 아니라 실제로 살린 도체가 있는 노드다", () => {
+    // 자격은 있으나(grid_forming) 개방 접점에 갇혀 아무것도 못 살린 경우
+    expect(evalWith(false).injectors).toEqual([]);
+    expect(codes(evalWith(false))).toContain("S021");
+  });
+
+  it("MID 내장 장치는 정전 시에도 소스에서 빠지지 않는다 — 자동 개방과 지정 트립은 다르다", () => {
+    expect(evalWith(true).injectors).toContain("unit");
+    const tripped = evaluateScenario(topo, [...devices, allInOne(true)], scen("outage_islanded"), {
+      open: ["unit"],
+    });
+    expect(tripped.injectors).toEqual([]);
   });
 });
 

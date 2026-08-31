@@ -37,6 +37,13 @@ export const Port = z.object({
   max_connections: z.number().int().positive().default(1),
   /** 이 포트에 요구되는 과전류 보호 정격. 모르면 null. */
   ocpd_a: z.number().positive().nullable().default(null),
+  /**
+   * MID 접점의 어느 쪽에 있는 포트인가. provides_mid 장치에서만 의미가 있다.
+   * MID를 내장한 올인원 장치는 접점 양쪽에 포트를 갖는다 — 이 값이 없으면
+   * 엔진이 아일랜드 경계를 장치 내부에 그릴 수 없어 보수적으로 전체를 차단한다.
+   * null = 해당 없음 또는 미확인.
+   */
+  mid_side: z.enum(["grid", "load"]).nullable().default(null),
 });
 
 /** 모든 값은 nullable. 확인되지 않은 숫자를 추정해 채우지 않는다. */
