@@ -3,7 +3,7 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 3 완료 상태 — UI 없음.** 스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진까지.
+**현재 스프린트 4 완료 상태 — UI 없음.** 스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교표까지.
 
 ```bash
 npm install
@@ -11,6 +11,7 @@ npm run validate    # 전 데이터 파일 검증 (error 있으면 exit 1)
 npm run render      # topologies/ → out/*.svg 단선도
 npm run render -- --scenario all   # 시나리오별 급전 상태를 반영한 도면
 npm run check       # 룰 엔진 — 코드 체크 Finding
+npm run compare     # 벤더별 구성 비교표 (최대 4종)
 npm test            # 검증기 + 렌더러 + 시나리오 · 룰 엔진 단위 테스트
 npm run typecheck
 ```
@@ -34,9 +35,11 @@ npm run typecheck
 | `src/graph/` | topology + device → 해석된 그래프 (렌더러·시나리오·룰 공용) |
 | `src/scenario/` | (topology, scenario) → 급전 상태 + 흐름 방향 (순수 함수) |
 | `src/rules/` | 룰 실행 엔진 |
+| `src/compare/` | 벤더별 구성 비교 (순수 함수) |
 | `scripts/validate.ts` | 검증 CLI |
 | `scripts/render.ts` | 렌더 CLI |
 | `scripts/check.ts` | 룰 CLI |
+| `scripts/compare.ts` | 비교 CLI |
 
 ## 데이터 작성 규칙
 
@@ -58,6 +61,7 @@ npm run typecheck
 | E024 | 포트 연결 수 초과 |
 | E025 | `requires_one_of` 미충족 (예: 배터리는 있는데 MID 없음) |
 | W030 | 백업 구성인데 MID 제공 장치 없음 |
+| W031 | 백업 구성인데 MID 제공 여부가 미확인 |
 | I010/I020/I021/I040 | 출처 날짜 누락, draft 사용, 미사용 device |
 
 `npm run check`(룰 엔진)는 별도 코드 체계를 쓴다. 데이터 정합성이 아니라

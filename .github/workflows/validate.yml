@@ -13,4 +13,5 @@ jobs:
       - run: npm run render
       - run: npm run render -- --scenario all
       - run: npm run check
+      - run: npm run compare
       - run: npm test
