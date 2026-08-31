@@ -1,0 +1,15 @@
+{
+  "id": "fault",
+  "display_name": "고장 — 브레이커 트립",
+  "description": "계통은 정상이나 지정된 브레이커/장치가 개방되어 하위 경로가 사선화된다. 트립 대상은 호출자가 지정한다.",
+  "order": 4,
+  "grid": "present",
+  "pv": "producing",
+  "battery": "available",
+  "open_nodes": [],
+  "requires_trip_target": true,
+  "load_shed": false,
+  "notes": [
+    "트립 대상은 토폴로지마다 다르므로 시나리오 파일에 고정하지 않는다. evaluateScenario의 open 인자로 넘긴다."
+  ]
+}

@@ -11,6 +11,8 @@ ports:
   - { id: ac_out, type: ac_240v_split, direction: bidirectional }
   - { id: comms, type: comms_proprietary, direction: bidirectional }
 provides_mid: false
+grid_forming: true          # Meter Collar 개방 후 아일랜드를 세우는 주체
+black_start_capable: null   # TODO: 무잔량 기동 가능 여부 확인
 requires_one_of: [enphase-iq-meter-collar]
 needs_backup_subpanel: "no"
 certifications: []
@@ -22,3 +24,4 @@ sources:
 todos:
   - "LRA 및 서지 정격 확인"
   - "최대 확장 유닛 수 확인"
+  - "grid_forming=true는 whole_home 백업 구성 성립으로부터 도출. 매뉴얼 문구로 재확인 필요"

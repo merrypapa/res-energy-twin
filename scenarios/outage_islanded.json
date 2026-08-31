@@ -1,0 +1,16 @@
+{
+  "id": "outage_islanded",
+  "display_name": "정전 — 아일랜딩",
+  "description": "계통 상실. provides_mid 장치가 개방되어 계통과 분리되고, 백업 경계 안쪽만 그리드 포밍 장치가 급전한다.",
+  "order": 1,
+  "grid": "absent",
+  "pv": "producing",
+  "battery": "available",
+  "open_nodes": [],
+  "requires_trip_target": false,
+  "load_shed": false,
+  "notes": [
+    "MID는 여기 나열하지 않는다. 계통 부재 시 provides_mid=true 장치가 자동 개방된다.",
+    "백업 경계는 MID의 위치가 정한다. 미터 위치 MID는 전체 부하를, 부하측 MID는 서브패널만 포함한다."
+  ]
+}

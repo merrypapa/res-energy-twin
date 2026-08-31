@@ -1,0 +1,16 @@
+{
+  "id": "load_shed",
+  "display_name": "부하 차단",
+  "description": "아일랜드 운전 중 야간(PV 없음). 축전지만으로 급전하며 우선순위가 낮은 부하를 차단한다.",
+  "order": 3,
+  "grid": "absent",
+  "pv": "dark",
+  "battery": "available",
+  "open_nodes": [],
+  "requires_trip_target": false,
+  "load_shed": true,
+  "notes": [
+    "현재 토폴로지에 부하(분기회로) 노드가 없어 실제 차단 대상이 없다. 엔진이 이 gap을 finding으로 보고한다.",
+    "부하 노드와 우선순위 필드가 추가되면 이 시나리오가 실제 동작한다. 그 전까지 급전 결과는 outage_islanded의 야간판과 같다."
+  ]
+}

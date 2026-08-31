@@ -1,0 +1,15 @@
+{
+  "id": "grid_normal",
+  "display_name": "계통 정상",
+  "description": "유틸리티 연계 상태. PV가 부하를 먼저 채우고 잉여는 계통으로 수출된다. MID는 닫혀 있다.",
+  "order": 0,
+  "grid": "present",
+  "pv": "producing",
+  "battery": "available",
+  "open_nodes": [],
+  "requires_trip_target": false,
+  "load_shed": false,
+  "notes": [
+    "수출 여부는 부하 크기에 달렸으나 이 도구는 크기를 모델링하지 않는다. 급전과 흐름 방향만 답한다."
+  ]
+}

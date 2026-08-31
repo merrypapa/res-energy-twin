@@ -15,6 +15,8 @@ ports:
   - { id: comms, type: comms_ethernet, direction: bidirectional }
   - { id: comms_local, type: comms_proprietary, direction: bidirectional }   # Backup Switch/Gateway 연결
 provides_mid: false
+grid_forming: true          # 전체 백업 구성의 유일한 AC 소스 — 아일랜드를 세우는 주체
+black_start_capable: null   # TODO: PV만으로 무잔량 기동 가능 여부 매뉴얼 확인
 requires_one_of: [tesla-backup-switch, tesla-gateway-3]
 needs_backup_subpanel: conditional
 certifications: [UL9540, UL1741-SB]
@@ -27,3 +29,4 @@ todos:
   - "ac_out ocpd_a 60A는 11.5kW/240V 연속전류 기준 산출값. 매뉴얼 명시값과 대조 필요"
   - "max_pv_dc_kw 확인"
   - "comms_local 실제 매체(유선 RS485/무선) 확인 — 현재 proprietary로 임시 분류"
+  - "grid_forming=true는 whole_home 백업 구성에서 유일한 AC 소스라는 데이터로부터 도출. 매뉴얼 문구로 재확인 필요"

@@ -1,0 +1,15 @@
+{
+  "id": "black_start",
+  "display_name": "블랙스타트",
+  "description": "계통도 없고 축전지 잔량도 없는 상태에서 PV만으로 기동을 시도한다. black_start_capable=true 장치가 있어야 성립한다.",
+  "order": 2,
+  "grid": "absent",
+  "pv": "producing",
+  "battery": "depleted",
+  "open_nodes": [],
+  "requires_trip_target": false,
+  "load_shed": false,
+  "notes": [
+    "black_start_capable이 null(미확인)인 장치는 기동 불가로 취급한다. 매뉴얼 대조 전까지 성립을 주장하지 않는다."
+  ]
+}

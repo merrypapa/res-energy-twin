@@ -8,6 +8,8 @@ ports:
   - { id: dc_in, type: dc_pv_module, direction: in }
   - { id: ac_out, type: ac_240v_split, direction: out }
 provides_mid: false
+grid_forming: null          # TODO: IQ8 계열 그리드 포밍 여부는 모델별 상이. 매뉴얼 확인 전까지 미확정
+black_start_capable: null
 requires_one_of: []
 needs_backup_subpanel: "no"
 certifications: []
@@ -15,3 +17,4 @@ utility_approval: null
 sources: []
 todos:
   - "스텁 파일. 모델별(IQ8+/8M/8A 등) 정격 분리 필요"
+  - "grid_forming 확인. null인 동안 엔진은 아일랜드에서 이 장치를 소스로 쓰지 않는다"
