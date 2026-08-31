@@ -107,8 +107,19 @@ CI가 데이터 PR에서도 전 파이프라인(검증 · 도면 · 룰 · 비�
 ## 배포
 
 `main` 푸시마다 GitHub Pages로 나간다 (`.github/workflows/pages.yml`).
-리포 설정에서 Pages를 켜야 동작한다 (Settings → Pages → Source: GitHub Actions).
-private 리포의 Pages는 유료 플랜이 필요하다.
+
+**최초 1회 저장소 설정이 필요하다.** 워크플로가 스스로 Pages를 켜려 하지만
+(`configure-pages` 의 `enablement: true`), 기본 상태에서는 토큰 권한이 모자라
+`Create Pages site failed — Resource not accessible by integration` 으로 멈춘다.
+
+둘 중 하나를 하면 된다.
+
+1. Settings → Pages → Source 를 **GitHub Actions** 로 지정 (권장, 한 번이면 끝)
+2. Settings → Actions → General → Workflow permissions 를
+   **Read and write permissions** 로 변경 — 그러면 워크플로가 직접 켠다
+
+빌드 자체는 이 설정과 무관하게 통과한다 (`npm ci` → `validate` → `test` → `build`).
+막히는 것은 배포 단계뿐이다. private 리포라면 Pages에 유료 플랜이 필요하다.
 
 ## 남은 것
 

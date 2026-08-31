@@ -87,9 +87,20 @@ typecheck → validate → render → render --scenario all → check → compar
 `.github/workflows/pages.yml` — main 푸시마다 validate → test → build → Pages 배포.
 `PAGES_BASE` 를 리포 이름에서 받으므로 리포명이 바뀌어도 코드는 그대로다.
 
-**리포 설정에서 Pages를 켜야 동작한다** (Settings → Pages → Source: GitHub Actions).
-private 리포의 Pages는 유료 플랜이 필요하다 — 무료 플랜이면 리포를 public으로
-바꾸거나 배포 워크플로를 비활성화한다.
+`enablement: true` 를 줘서 워크플로가 스스로 Pages를 켜게 했으나, 기본 상태에서는
+토큰 권한이 모자라 실패한다.
+
+```
+HttpError: Create Pages site failed.
+Error: Resource not accessible by integration
+```
+
+**최초 1회 저장소 설정이 필요하다.** Settings → Pages → Source 를 GitHub Actions 로
+지정하거나, Settings → Actions → General → Workflow permissions 를
+Read and write 로 바꾼다.
+
+빌드 단계(`npm ci` → `validate` → `test` → `build`)는 이 설정과 무관하게 통과한다.
+막히는 것은 배포 한 단계뿐이다.
 
 ## 알려진 공백
 
