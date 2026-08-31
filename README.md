@@ -3,14 +3,18 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 0 완료 상태 — UI 없음.** 스키마와 데이터 검증기까지만 있다.
+**현재 스프린트 1 완료 상태 — UI 없음.** 스키마 · 검증기 · 정적 SLD 렌더러까지.
 
 ```bash
 npm install
 npm run validate    # 전 데이터 파일 검증 (error 있으면 exit 1)
-npm test            # 룰 단위 테스트
+npm run render      # topologies/ → out/*.svg 단선도
+npm test            # 검증기 + 렌더러 단위 테스트
 npm run typecheck
 ```
+
+`npm run render`는 `--layers power,comms`(기본), `--out <dir>`, `--date <YYYY-MM-DD>`를 받는다.
+스키마 error가 하나라도 있으면 도면을 그리지 않고 종료한다.
 
 ## 구조
 
@@ -21,7 +25,9 @@ npm run typecheck
 | `src/validate/` | 로더 + 검증 규칙 (순수 함수) |
 | `device-library/` | 제품 스펙 (YAML, 1제품 1파일) |
 | `topologies/` | 결선 그래프 (JSON, 1구성 1파일) |
-| `scripts/validate.ts` | CLI |
+| `src/render/` | 그래프 → 계층 배치 → SVG (벤더 분기문 없음) |
+| `scripts/validate.ts` | 검증 CLI |
+| `scripts/render.ts` | 렌더 CLI |
 
 ## 데이터 작성 규칙
 
@@ -45,6 +51,15 @@ npm run typecheck
 | W030 | 백업 구성인데 MID 제공 장치 없음 |
 | I010/I020/I021/I040 | 출처 날짜 누락, draft 사용, 미사용 device |
 
+## 도면 규칙
+
+- 심볼은 **device class 하나로만** 고른다 (`src/render/symbols.ts`). 벤더/제품 id로 분기하지 않는다.
+  이 금지는 테스트로 강제된다 (렌더러 소스에 벤더명이 있으면 실패)
+- 색은 활선/사선만 나른다. 레이어 구분은 선 두께와 실선/파선
+- 급전 상태는 렌더러가 계산하지 않는다. `energization` 인자로 주입받는다 —
+  스프린트 2 시나리오 엔진의 출력이 그대로 들어올 자리다
+
 ## 다음
 
-스프린트 1: 그래프 → SVG 단선도 렌더러. 벤더 분기문 없이 스키마만 보고 그린다.
+스프린트 2: 시나리오 상태 머신. `(topology, scenario) => EnergizationMap`을 만들어
+지금의 렌더러에 그대로 물린다. 렌더러 쪽 변경은 없어야 정상이다.
