@@ -6,7 +6,7 @@
   "scripts": {
     "validate": "tsx scripts/validate.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npm run bundle && tsc --noEmit",
     "render": "tsx scripts/render.ts",
     "check": "tsx scripts/check.ts",
     "compare": "tsx scripts/compare.ts",
