@@ -1,12 +1,14 @@
-import { loadDevices, loadTopologies, validateAll } from "../src/validate/index.js";
+import { loadDevices, loadScenarios, loadTopologies, validateAll } from "../src/validate/index.js";
 import type { Finding } from "../src/schema/common.js";
 
 const DEVICE_DIR = "device-library";
 const TOPOLOGY_DIR = "topologies";
+const SCENARIO_DIR = "scenarios";
 
 const d = loadDevices(DEVICE_DIR);
 const t = loadTopologies(TOPOLOGY_DIR);
-const findings: Finding[] = [...d.findings, ...t.findings, ...validateAll(d.items, t.items)];
+const s = loadScenarios(SCENARIO_DIR);
+const findings: Finding[] = [...d.findings, ...t.findings, ...s.findings, ...validateAll(d.items, t.items)];
 
 const order = { error: 0, warning: 1, info: 2 } as const;
 findings.sort((a, b) => order[a.severity] - order[b.severity] || a.code.localeCompare(b.code));
