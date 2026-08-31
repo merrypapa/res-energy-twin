@@ -131,6 +131,26 @@ describe("SVG 출력", () => {
     expect(svg).toContain('class="node live" data-ref="msp"');
   });
 
+  it("급전 상태를 주입하면 제목란이 계통 정상이라고 주장하지 않는다", () => {
+    // 제목란은 폭에 맞춰 줄바꿈되므로 토막 문자열이 아니라 키워드로 본다.
+    const dead = { [`${tesla.edges[0]!.from}->${tesla.edges[0]!.to}`]: "dead" as const };
+    const noLabel = renderTopology(tesla, devices, { energization: dead, date: "2026-01-01" });
+    expect(noLabel).not.toContain("grid_normal");
+    expect(noLabel).toContain("미표기");
+
+    const labelled = renderTopology(tesla, devices, {
+      energization: dead,
+      scenario: "outage_islanded",
+      date: "2026-01-01",
+    });
+    expect(labelled).toContain("outage_islanded");
+    expect(labelled).not.toContain("grid_normal");
+  });
+
+  it("급전 주입이 없으면 계통 정상으로 표기한다", () => {
+    expect(renderTopology(tesla, devices, { date: "2026-01-01" })).toContain("grid_normal");
+  });
+
   it("같은 입력이면 같은 바이트가 나온다", () => {
     expect(renderTopology(tesla, devices, { date: "2026-01-01" })).toBe(
       renderTopology(tesla, devices, { date: "2026-01-01" }),

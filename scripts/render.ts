@@ -58,7 +58,7 @@ for (const t of topologies.items) {
     const svg = renderTopology(t, devices.items, {
       layers,
       date,
-      ...(result ? { energization: result.energization } : {}),
+      ...(result && sc ? { energization: result.energization, scenario: sc.id } : {}),
     });
     const file = join(outDir, sc ? `${t.id}.${sc.id}.svg` : `${t.id}.svg`);
     writeFileSync(file, svg, "utf8");

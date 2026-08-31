@@ -14,7 +14,7 @@ export interface RenderOptions {
   energization?: EnergizationMap;
   /** 제목란에 찍을 날짜. 미지정이면 표기하지 않는다(출력 결정론 유지). */
   date?: string | null;
-  /** 시나리오 이름(제목란 표기용). 스프린트 1에서는 계통 정상 상태만 그린다. */
+  /** 시나리오 이름(제목란 표기용). 급전 상태를 주입하면서 이 값을 빠뜨리면 도면이 거짓말을 한다. */
   scenario?: string | null;
 }
 
@@ -155,7 +155,7 @@ function titleBlock(
     `노드 ${t.nodes.length}`,
     `엣지 ${t.edges.length}`,
     `레이어 ${layers.join("/")}`,
-    opts.scenario ? `시나리오 ${opts.scenario}` : "시나리오 grid_normal",
+    scenarioCaption(opts),
     opts.date ? `작성 ${opts.date}` : null,
   ]
     .filter((s): s is string => s !== null)
@@ -219,4 +219,14 @@ export function renderTopology(topology: Topology, devices: Device[], opts: Rend
   ${block.markup}
 </svg>
 `;
+}
+
+/**
+ * 제목란의 시나리오 표기.
+ * 급전 상태를 주입받았는데 이름이 없으면 상태를 지어내지 않고 미표기라고 쓴다 —
+ * 예전에는 이 경우에도 "grid_normal"이 박혀 정전 도면이 계통 정상이라고 주장했다.
+ */
+function scenarioCaption(opts: RenderOptions): string {
+  if (opts.scenario) return `시나리오 ${opts.scenario}`;
+  return opts.energization ? "시나리오 미표기 — 급전 상태 주입됨" : "시나리오 grid_normal";
 }

@@ -55,7 +55,7 @@ export default function App() {
           svg: renderTopology(t, DEVICES, {
             layers,
             date: BUILT_AT,
-            ...(run ? { energization: run.energization } : {}),
+            ...(run && scenario ? { energization: run.energization, scenario: scenario.id } : {}),
           }),
           rules: runRules(t, DEVICES, site),
         };
