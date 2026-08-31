@@ -9,7 +9,7 @@ import {
   type RenderGraph,
   type RGEdge,
   type RGNode,
-} from "../render/graph.js";
+} from "../graph/index.js";
 
 /**
  * 시나리오 엔진 — (topology, devices, scenario) => 급전 상태 + 흐름 방향.

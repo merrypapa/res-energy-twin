@@ -1,7 +1,7 @@
 import type { Device } from "../schema/device.js";
 import type { Layer } from "../schema/common.js";
 import type { Topology } from "../schema/topology.js";
-import { buildRenderGraph, edgeState, nodeState, type EnergizationMap, type RenderGraph } from "./graph.js";
+import { buildRenderGraph, edgeState, nodeState, type EnergizationMap, type RenderGraph } from "../graph/index.js";
 import { layoutGraph, type Layout, type Pt, type RoutedEdge } from "./layout.js";
 import { symbolFor } from "./symbols.js";
 import { GEO, STROKE, THEME } from "./theme.js";

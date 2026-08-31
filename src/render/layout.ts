@@ -1,4 +1,4 @@
-import type { RenderGraph, RGEdge } from "./graph.js";
+import type { RenderGraph, RGEdge } from "../graph/index.js";
 import { symbolExtent } from "./symbols.js";
 import { GEO } from "./theme.js";
 

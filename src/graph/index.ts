@@ -3,10 +3,14 @@ import type { Topology } from "../schema/topology.js";
 import type { Layer } from "../schema/common.js";
 
 /**
- * topology(참조) + device-library(스펙) → 렌더 가능한 그래프.
+ * topology(참조) + device-library(스펙) → 해석된 그래프.
  *
- * 렌더러는 이 구조체까지만 본다. device.vendor / device.id로 분기하지 않는다.
- * 그림에 필요한 모든 정보(심볼 종류, 라벨, 정격 요약)는 class와 ratings에서 나온다.
+ * 렌더러 · 시나리오 엔진 · 룰 엔진이 공유하는 도메인 표현이다.
+ * 소비자는 이 구조체까지만 본다. device.vendor / device.id로 분기하지 않는다.
+ * 필요한 모든 정보(심볼 종류, 라벨, 정격 요약)는 class와 ratings에서 나온다.
+ *
+ * 스프린트 1에는 src/render/graph.ts에 있었다. 시나리오 엔진(스프린트 2)과
+ * 룰 엔진(스프린트 3)이 같은 해석을 필요로 해서 중립 위치로 옮겼다.
  */
 
 /** 엣지의 급전 상태. 스프린트 2 시나리오 엔진이 계산해 주입한다. */

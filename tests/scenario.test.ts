@@ -3,7 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadDevices, loadTopologies, loadScenarios } from "../src/validate/index.js";
 import { evaluateScenario, type ScenarioResult } from "../src/scenario/index.js";
-import { buildRenderGraph, renderTopology } from "../src/render/index.js";
+import { renderTopology } from "../src/render/index.js";
+import { buildRenderGraph } from "../src/graph/index.js";
 import { Scenario } from "../src/schema/scenario.js";
 import { Device } from "../src/schema/device.js";
 

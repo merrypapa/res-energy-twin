@@ -2,7 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { loadDevices, loadTopologies } from "../src/validate/index.js";
-import { buildRenderGraph, layoutGraph, renderTopology, hasSymbol, RenderGraphError } from "../src/render/index.js";
+import { layoutGraph, renderTopology, hasSymbol } from "../src/render/index.js";
+import { buildRenderGraph, RenderGraphError } from "../src/graph/index.js";
 import { DeviceClass, Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
@@ -138,9 +139,12 @@ describe("SVG 출력", () => {
 });
 
 describe("데이터가 제품이다 — 렌더러에 제품 지식이 없다", () => {
-  const sources = readdirSync("src/render")
-    .filter((f) => f.endsWith(".ts"))
-    .map((f) => ({ f, text: readFileSync(join("src/render", f), "utf8") }));
+  // 그래프 해석은 src/graph/로 옮겼다. 두 곳 모두 제품 지식이 없어야 한다.
+  const sources = ["src/render", "src/graph"].flatMap((dir) =>
+    readdirSync(dir)
+      .filter((f) => f.endsWith(".ts"))
+      .map((f) => ({ f: join(dir, f), text: readFileSync(join(dir, f), "utf8") })),
+  );
 
   it("렌더러 소스에 벤더/제품명이 등장하지 않는다", () => {
     const banned = /tesla|enphase|qcells|solaredge|powerwall|iq\s?battery|backup switch|meter collar/i;
