@@ -139,8 +139,17 @@ button, select, input { font: inherit; color: inherit; }
  * 단선도는 한눈에 읽혀야 한다. 너비에 맞춰 늘리면 세로로 잘리므로
  * 높이를 기준으로 맞추고 가로는 따라가게 둔다.
  */
-.sheet > .paper { flex: 1; min-height: 0; display: flex; justify-content: center; }
+/*
+ * align-items 기본값 stretch는 svg를 컨테이너 높이에 맞춰 눌러버린다.
+ * 컨테이너 높이가 0이면 도면도 0이 된다 — 좁은 화면에서 도면이 사라지던 원인.
+ */
+.sheet > .paper { flex: 1; min-height: 0; display: flex; justify-content: center; align-items: flex-start; }
 .sheet svg { display: block; height: auto; width: auto; max-width: 100%; max-height: 100%; }
+/*
+ * 단일 보기는 한 장이 화면에 다 들어와야 하므로 높이에 맞춘다.
+ * 비교 모드는 열이 좁아 높이에 맞추면 도면이 읽을 수 없게 줄어든다 — 폭을 채우고 세로로 스크롤한다.
+ */
+.sheets:not([data-n="1"]) .sheet svg { width: 100%; max-height: none; }
 
 /* ── 검증 결과 ──────────────────────────────────────── */
 .finding {
@@ -177,10 +186,35 @@ button, select, input { font: inherit; color: inherit; }
 
 /* ── 모바일: 현장에서 최소한 읽히기는 해야 한다 ────────── */
 @media (max-width: 900px) {
-  .columns { grid-template-columns: 1fr; }
-  .pane.left, .pane.right { border: none; border-bottom: 1px solid var(--rule-strong); max-height: 40vh; }
+  /*
+   * 좁은 화면에서 스크롤 영역이 셋이면 손가락으로 못 쓴다.
+   * 문서 하나로 합치고, 도면을 맨 앞에 둔다 — 그것이 이 도구의 요점이다.
+   */
+  html, body, #root { height: auto; }
+  .app { height: auto; }
+  .columns { grid-template-columns: 1fr; min-height: 0; }
+  .pane { overflow: visible; max-height: none; }
+
+  .pane.canvas { order: -1; }
+  .pane.left, .pane.right { border: none; border-top: 1px solid var(--rule-strong); }
+
+  /*
+   * 툴바가 세 줄이라 sticky로 두면 화면의 3분의 1을 가린다. 흘려보낸다.
+   * 대신 버튼을 줄여 줄 수를 낮춘다.
+   */
+  .canvas-bar { padding: 8px 12px; gap: 6px; }
+  .toggle { padding: 3px 8px; font-size: 13px; }
+  .canvas-bar .label { font-size: 11px; }
+
+  .sheets { min-height: 0; padding: 12px; overflow: visible; }
   .sheets[data-n] { grid-template-columns: 1fr; }
-  /* 좁은 화면에서는 높이 제한을 풀고 스크롤로 읽는다 */
-  .sheets { min-height: 0; }
+  /* 폭에 맞춰 채운다. 높이 제한을 두면 세로로 눌린다 */
   .sheet svg { max-height: none; width: 100%; }
+
+  .masthead { gap: 4px 12px; }
+  .masthead .spacer { display: none; }
+  .diff table { font-size: 12px; }
 }
+
+/* 식별자는 띄어쓰기가 없어 좁은 화면에서 가로 스크롤을 만든다 */
+.finding .msg, .finding .refs, .finding .code, .diff td, .diff th { overflow-wrap: anywhere; }
