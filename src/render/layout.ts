@@ -1,11 +1,15 @@
 import type { RenderGraph, RGEdge } from "../graph/index.js";
-import { symbolExtent } from "./symbols.js";
+import { isNarrow, symbolExtent, type DeviceClassName } from "./symbols.js";
 import { GEO } from "./theme.js";
 
 /**
  * 계층 배치. 전력 흐름이 위 → 아래로 흐르도록 랭크를 매기고, 랭크 안에서
  * 교차가 줄어드는 순서를 찾는다. 통신 엣지는 배치에 영향을 주지 않는다
  * (통신선이 전력 계층 구조를 왜곡하면 단선도로 읽히지 않는다).
+ *
+ * 배열 그룹(직렬 스트링 · AC 트렁크)은 한 덩어리로 취급한다. 그룹 안의 결선은
+ * 같은 랭크 안의 수평선이 되고, 랭크는 그룹 단위로 축약한 그래프에서 매긴다 —
+ * 그러지 않으면 모듈 20장이 20단 계단이 되어 단선도가 아니라 사다리가 된다.
  *
  * 범용 그래프 라이브러리는 쓰지 않는다 (CLAUDE.md §7). 필요성이 증명되면 그때.
  */
@@ -40,28 +44,47 @@ export interface Layout {
   height: number;
 }
 
-type Item = { kind: "node"; key: string } | { kind: "dummy"; key: string; edgeId: string };
+type Item =
+  | { kind: "node"; key: string }
+  | { kind: "dummy"; key: string; edgeId: string }
+  | { kind: "group"; key: string; members: string[] };
 
 const DUMMY_W = 20;
 
-/** 전력 엣지 기준 최장경로 랭크. 사이클이 있으면 남은 노드를 뒤에 몰아 배치한다. */
+/** 노드 상자 폭. 배열 소자는 좁다 — class로만 판정한다. */
+function nodeWidth(cls: DeviceClassName): number {
+  return isNarrow(cls) ? GEO.arrayNodeW : GEO.nodeW;
+}
+
+/** 배치 단위 키. 그룹에 속한 노드는 그룹 전체가 한 단위다. */
+function unitKey(g: RenderGraph, ref: string): string {
+  return g.byRef.get(ref)?.group ?? ref;
+}
+
+/**
+ * 전력 엣지 기준 최장경로 랭크. 사이클이 있으면 남은 노드를 뒤에 몰아 배치한다.
+ * 그룹 단위로 축약한 그래프에서 매기고, 결과를 그룹 구성원에게 그대로 물려준다.
+ */
 function computeRanks(g: RenderGraph): Map<string, number> {
-  const power = g.edges.filter((e) => e.layer === "power");
+  const units = [...new Set(g.nodes.map((n) => unitKey(g, n.ref)))];
+  const power = g.edges
+    .map((e) => ({ e, a: unitKey(g, e.from.nodeRef), b: unitKey(g, e.to.nodeRef) }))
+    .filter((x) => x.e.layer === "power" && x.a !== x.b);
+
   const indeg = new Map<string, number>();
   const succ = new Map<string, string[]>();
-  for (const n of g.nodes) {
-    indeg.set(n.ref, 0);
-    succ.set(n.ref, []);
+  for (const u of units) {
+    indeg.set(u, 0);
+    succ.set(u, []);
   }
-  for (const e of power) {
-    if (e.from.nodeRef === e.to.nodeRef) continue;
-    succ.get(e.from.nodeRef)!.push(e.to.nodeRef);
-    indeg.set(e.to.nodeRef, (indeg.get(e.to.nodeRef) ?? 0) + 1);
+  for (const { a, b } of power) {
+    succ.get(a)!.push(b);
+    indeg.set(b, (indeg.get(b) ?? 0) + 1);
   }
 
   const rank = new Map<string, number>();
-  const queue = g.nodes.filter((n) => (indeg.get(n.ref) ?? 0) === 0).map((n) => n.ref);
-  for (const ref of queue) rank.set(ref, 0);
+  const queue = units.filter((u) => (indeg.get(u) ?? 0) === 0);
+  for (const u of queue) rank.set(u, 0);
 
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i]!;
@@ -74,25 +97,28 @@ function computeRanks(g: RenderGraph): Map<string, number> {
     }
   }
 
-  // 사이클에 걸려 확정되지 않은 노드 (데이터 오류에 가깝지만 그리기는 해야 한다)
+  // 사이클에 걸려 확정되지 않은 단위 (데이터 오류에 가깝지만 그리기는 해야 한다)
   const maxRank = Math.max(0, ...rank.values());
-  for (const n of g.nodes) if (!rank.has(n.ref)) rank.set(n.ref, maxRank + 1);
+  for (const u of units) if (!rank.has(u)) rank.set(u, maxRank + 1);
 
-  // 전원(유입 엣지가 없는 노드)을 소비처 바로 위로 끌어내린다.
+  // 전원(유입 엣지가 없는 단위)을 소비처 바로 위로 끌어내린다.
   // 배터리를 최상단에 올려두면 긴 엣지가 생기고 계층이 실제 결선보다 깊어 보인다.
-  for (const n of g.nodes) {
-    const outs = succ.get(n.ref) ?? [];
-    const hasIncoming = power.some((e) => e.to.nodeRef === n.ref);
+  for (const u of units) {
+    const outs = succ.get(u) ?? [];
+    const hasIncoming = power.some((x) => x.b === u);
     if (hasIncoming || outs.length === 0) continue;
-    const tight = Math.min(...outs.map((s) => rank.get(s) ?? 0)) - 1;
-    if (tight > (rank.get(n.ref) ?? 0)) rank.set(n.ref, tight);
+    const tight = Math.min(...outs.map((s2) => rank.get(s2) ?? 0)) - 1;
+    if (tight > (rank.get(u) ?? 0)) rank.set(u, tight);
   }
 
   // 비어 버린 랭크는 접는다 (빈 띠가 도면에 남지 않도록)
   const used = [...new Set(rank.values())].sort((a, b) => a - b);
   const remap = new Map(used.map((r, i) => [r, i]));
-  for (const [ref, r] of rank) rank.set(ref, remap.get(r)!);
-  return rank;
+  for (const [u, r] of rank) rank.set(u, remap.get(r)!);
+
+  const byNode = new Map<string, number>();
+  for (const n of g.nodes) byNode.set(n.ref, rank.get(unitKey(g, n.ref))!);
+  return byNode;
 }
 
 /** 인접 랭크 사이의 연결. 긴 엣지는 더미를 거쳐 한 칸씩 끊어 둔다. */
@@ -104,20 +130,33 @@ interface Segment {
 
 function buildLayers(g: RenderGraph, rank: Map<string, number>) {
   const power = g.edges.filter((e) => e.layer === "power" && e.from.nodeRef !== e.to.nodeRef);
+  /** 같은 랭크 안의 결선 — 직렬 스트링, AC 트렁크. 계층 구조에 관여하지 않는다. */
+  const flat = power.filter((e) => rank.get(e.from.nodeRef) === rank.get(e.to.nodeRef));
+  const layered = power.filter((e) => rank.get(e.from.nodeRef) !== rank.get(e.to.nodeRef));
+
   const depth = Math.max(0, ...rank.values()) + 1;
   const layers: Item[][] = Array.from({ length: depth }, () => []);
-  for (const n of g.nodes) layers[rank.get(n.ref)!]!.push({ kind: "node", key: n.ref });
+  const placed = new Set<string>();
+  for (const n of g.nodes) {
+    const key = unitKey(g, n.ref);
+    if (placed.has(key)) continue;
+    placed.add(key);
+    const members = g.nodes.filter((m) => unitKey(g, m.ref) === key).map((m) => m.ref);
+    layers[rank.get(n.ref)!]!.push(
+      members.length > 1 ? { kind: "group", key, members } : { kind: "node", key: n.ref },
+    );
+  }
 
   const segments: Segment[] = [];
   /** edgeId → 더미 key들(랭크 오름차순) */
   const chains = new Map<string, string[]>();
 
-  for (const e of power) {
+  for (const e of layered) {
     const r0 = rank.get(e.from.nodeRef)!;
     const r1 = rank.get(e.to.nodeRef)!;
     const step = r1 > r0 ? 1 : -1;
     const chain: string[] = [];
-    let prev = e.from.nodeRef;
+    let prev = unitKey(g, e.from.nodeRef);
     for (let r = r0 + step; r !== r1; r += step) {
       const key = `~${e.id}#${r}`;
       layers[r]!.push({ kind: "dummy", key, edgeId: e.id });
@@ -125,15 +164,14 @@ function buildLayers(g: RenderGraph, rank: Map<string, number>) {
       segments.push(step > 0 ? { upper: prev, lower: key, edgeId: e.id } : { upper: key, lower: prev, edgeId: e.id });
       prev = key;
     }
+    const far = unitKey(g, e.to.nodeRef);
     segments.push(
-      step > 0
-        ? { upper: prev, lower: e.to.nodeRef, edgeId: e.id }
-        : { upper: e.to.nodeRef, lower: prev, edgeId: e.id },
+      step > 0 ? { upper: prev, lower: far, edgeId: e.id } : { upper: far, lower: prev, edgeId: e.id },
     );
     chains.set(e.id, chain);
   }
 
-  return { layers, segments, chains, rankOf: rank };
+  return { layers, segments, chains, flat, layered, rankOf: rank };
 }
 
 /** 중앙값 정렬 2회 왕복. 결정론적이며, 동률이면 선언 순서를 유지한다. */
@@ -230,26 +268,82 @@ function labelFor(points: Pt[], text: string | null): RoutedEdge["label"] {
 
 export function layoutGraph(g: RenderGraph): Layout {
   const rank = computeRanks(g);
-  const { layers, segments, chains } = buildLayers(g, rank);
+  const { layers, segments, chains, flat, layered } = buildLayers(g, rank);
   orderLayers(layers, segments);
 
   // ── 좌표 배정 ────────────────────────────────────────────────
-  const widthOf = (it: Item) => (it.kind === "node" ? GEO.nodeW : DUMMY_W);
+  const classOf = (ref: string) => g.byRef.get(ref)!.device.class;
+  const memberW = (ref: string) => nodeWidth(classOf(ref));
+  const innerGap = (members: string[]) =>
+    members.every((m) => isNarrow(classOf(m))) ? GEO.arrayColGap : GEO.colGap;
+
+  const widthOf = (it: Item): number => {
+    if (it.kind === "dummy") return DUMMY_W;
+    if (it.kind === "node") return memberW(it.key);
+    return (
+      it.members.reduce((sum, m) => sum + memberW(m), 0) + (it.members.length - 1) * innerGap(it.members)
+    );
+  };
   const rankWidth = (layer: Item[]) =>
     layer.reduce((sum, it) => sum + widthOf(it), 0) + Math.max(0, layer.length - 1) * GEO.colGap;
-  const widest = Math.max(GEO.nodeW, ...layers.map(rankWidth));
+
+  /**
+   * 배열 그룹이 있는 랭크는 그룹 구간을 랭크끼리 같은 x에 맞춘다.
+   * 랭크마다 따로 가운데 정렬하면, 옆에 붙은 함체 하나 때문에 모듈 20장과
+   * 인버터 20대가 어긋나 20개의 사선이 생긴다 — 1:1 대응이 눈에 보이지 않는다.
+   */
+  const segmentsOf = (layer: Item[]) => {
+    const first = layer.findIndex((it) => it.kind === "group");
+    if (first < 0) return null;
+    let last = first;
+    layer.forEach((it, i) => {
+      if (it.kind === "group") last = i;
+    });
+    const pre = layer.slice(0, first);
+    const span = layer.slice(first, last + 1);
+    const post = layer.slice(last + 1);
+    const w = (items: Item[]) => (items.length === 0 ? 0 : rankWidth(items) + GEO.colGap);
+    return { pre, span, post, preW: w(pre), spanW: rankWidth(span), postW: w(post) };
+  };
+
+  const parts = layers.map(segmentsOf);
+  const leftMax = Math.max(0, ...parts.map((p) => p?.preW ?? 0));
+  const spanMax = Math.max(0, ...parts.map((p) => p?.spanW ?? 0));
+  const rightMax = Math.max(0, ...parts.map((p) => p?.postW ?? 0));
+  const widest = Math.max(GEO.nodeW, leftMax + spanMax + rightMax, ...layers.map(rankWidth));
   const originX = GEO.margin;
   const originY = GEO.margin;
 
   const boxes = new Map<string, { x: number; y: number; w: number; h: number; rank: number }>();
   layers.forEach((layer, r) => {
-    let cursor = originX + (widest - rankWidth(layer)) / 2;
+    const part = parts[r] ?? null;
     const y = originY + r * (GEO.nodeH + GEO.rankGap);
-    for (const it of layer) {
-      const w = widthOf(it);
-      boxes.set(it.key, { x: cursor, y, w, h: GEO.nodeH, rank: r });
-      cursor += w + GEO.colGap;
+    const place = (items: Item[], from: number) => {
+      let cursor = from;
+      for (const it of items) {
+        if (it.kind === "group") {
+          const gap = innerGap(it.members);
+          let inner = cursor;
+          for (const ref of it.members) {
+            const w = memberW(ref);
+            boxes.set(ref, { x: inner, y, w, h: GEO.nodeH, rank: r });
+            inner += w + gap;
+          }
+        } else {
+          boxes.set(it.key, { x: cursor, y, w: widthOf(it), h: GEO.nodeH, rank: r });
+        }
+        cursor += widthOf(it) + GEO.colGap;
+      }
+    };
+
+    if (part === null) {
+      place(layer, originX + (widest - rankWidth(layer)) / 2);
+      return;
     }
+    const spanStart = originX + leftMax + (spanMax - part.spanW) / 2;
+    place(part.pre, spanStart - part.preW);
+    place(part.span, spanStart);
+    place(part.post, spanStart + part.spanW + GEO.colGap);
   });
 
   const nodes: PlacedNode[] = g.nodes.map((n) => {
@@ -262,8 +356,8 @@ export function layoutGraph(g: RenderGraph): Layout {
     return { x: b.x + b.w / 2, y: b.y + b.h / 2 };
   };
 
-  // ── 포트 앵커: 전력은 상/하단, 통신은 우측 ──────────────────────
-  const powerEdges = g.edges.filter((e) => e.layer === "power");
+  // ── 포트 앵커: 랭크를 넘는 전력선은 상/하단, 통신은 우측 ─────────
+  const powerEdges = layered;
   const otherEdges = g.edges.filter((e) => e.layer !== "power");
 
   /** 엣지가 노드를 떠난 직후 향하는 지점의 x — 앵커 정렬 기준 */
@@ -301,6 +395,23 @@ export function layoutGraph(g: RenderGraph): Layout {
     const mids = (chains.get(e.id) ?? []).map(centerOf);
     const points = orthogonal([start, ...mids, end]);
     routed.push({ edge: e, points, label: labelFor(points, e.conductor) });
+  }
+
+  // ── 같은 랭크 안의 결선: 직렬 스트링 · AC 트렁크 ───────────────
+  // 심볼 옆구리에서 이웃 심볼 옆구리로 곧장 잇는다. 도면에서 이 선이 수평이라는 것
+  // 자체가 정보다 — 전압(직렬)이나 전류(트렁크)가 이 방향으로 누적된다는 뜻이다.
+  for (const e of flat) {
+    const a = boxes.get(e.from.nodeRef)!;
+    const b = boxes.get(e.to.nodeRef)!;
+    const forward = a.x <= b.x;
+    const [aHalf] = symbolExtent(classOf(e.from.nodeRef));
+    const [bHalf] = symbolExtent(classOf(e.to.nodeRef));
+    const y = a.y + GEO.glyphCy;
+    const points: Pt[] = [
+      { x: a.x + a.w / 2 + (forward ? aHalf : -aHalf), y },
+      { x: b.x + b.w / 2 + (forward ? -bHalf : bHalf), y },
+    ];
+    routed.push({ edge: e, points, label: null });
   }
 
   // ── 통신/물리 레이어 ─────────────────────────────────────────

@@ -1,14 +1,14 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadTopologies } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies } from "../src/validate/index.js";
 import { layoutGraph, renderTopology, hasSymbol } from "../src/render/index.js";
 import { buildRenderGraph, RenderGraphError } from "../src/graph/index.js";
 import { DeviceClass, Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library").items;
-const topologies = loadTopologies("topologies").items;
+const topologies = loadPresetTopologies("configurations").items;
 const byId = (id: string) => topologies.find((t) => t.id === id)!;
 
 const tesla = byId("tesla-pw3-backup-switch-whole-home");
@@ -54,7 +54,10 @@ describe("계층 배치", () => {
         return l.nodes.find((n) => n.ref === ref)!.rank;
       };
       expect(rankOf("service_point")).toBeLessThan(rankOf("main_panel"));
-      expect(rankOf("mid")).toBeLessThan(rankOf("main_panel"));
+      // MID가 메인 패널 위인 것은 전체 백업일 때다. 부분 백업은 MID가 패널 분기
+      // 아래에 달리므로 순서가 뒤집히는 것이 맞다 — 도면이 결선을 따라간다.
+      if (t.backup_scope === "whole_home") expect(rankOf("mid")).toBeLessThan(rankOf("main_panel"));
+      else if (t.backup_scope === "partial") expect(rankOf("mid")).toBeGreaterThan(rankOf("main_panel"));
     }
   });
 

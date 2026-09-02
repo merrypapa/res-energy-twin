@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadTopologies } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies } from "../src/validate/index.js";
 import { runRules } from "../src/rules/engine.js";
 import type { Rule } from "../src/rules/types.js";
 import { RULES } from "../rules/index.js";
@@ -10,7 +10,7 @@ import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library").items;
-const topologies = loadTopologies("topologies").items;
+const topologies = loadPresetTopologies("configurations").items;
 const tesla = topologies.find((t) => t.id.startsWith("tesla"))!;
 const enphase = topologies.find((t) => t.id.startsWith("enphase"))!;
 

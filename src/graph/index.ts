@@ -30,6 +30,8 @@ export interface RGNode {
   device: Device;
   label: string;
   count: number;
+  /** 배열 그룹 id. 같은 그룹은 한 랭크에 나란히 놓인다. null = 단독 노드. */
+  group: string | null;
   /** 정격 요약 한 줄. 값이 없으면 null — 추정치를 만들어 넣지 않는다. */
   meta: string | null;
 }
@@ -119,6 +121,7 @@ export function buildRenderGraph(
       device,
       label: n.label ?? device.display_name,
       count: n.count,
+      group: n.group,
       meta: ratingSummary(device),
     };
     nodes.push(node);

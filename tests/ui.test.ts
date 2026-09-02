@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseHash, toHash, type UiState } from "../src/ui/urlState.js";
 import { EMPTY_SITE, SiteContext } from "../src/schema/rule.js";
-import { loadDevices, loadScenarios, loadTopologies } from "../src/validate/index.js";
+import { loadDevices, loadScenarios, loadPresetTopologies } from "../src/validate/index.js";
 import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 import { Scenario } from "../src/schema/scenario.js";
@@ -61,7 +61,7 @@ describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", 
 describe("UI 번들 계약", () => {
   it("번들에 실리는 데이터가 전부 스키마를 통과한다 — 앱은 검증된 것만 본다", () => {
     for (const d of loadDevices("device-library").items) expect(() => Device.parse(d)).not.toThrow();
-    for (const t of loadTopologies("topologies").items) expect(() => Topology.parse(t)).not.toThrow();
+    for (const t of loadPresetTopologies("configurations").items) expect(() => Topology.parse(t)).not.toThrow();
     for (const s of loadScenarios("scenarios").items) expect(() => Scenario.parse(s)).not.toThrow();
   });
 });

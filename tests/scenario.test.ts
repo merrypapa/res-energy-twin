@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadTopologies, loadScenarios } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, loadScenarios } from "../src/validate/index.js";
 import { evaluateScenario, type ScenarioResult } from "../src/scenario/index.js";
 import { renderTopology } from "../src/render/index.js";
 import { buildRenderGraph } from "../src/graph/index.js";
@@ -10,7 +10,7 @@ import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library").items;
-const topologies = loadTopologies("topologies").items;
+const topologies = loadPresetTopologies("configurations").items;
 const scenarios = loadScenarios("scenarios").items;
 
 const topo = (id: string) => topologies.find((t) => t.id.startsWith(id))!;
@@ -50,10 +50,25 @@ describe("계통 정상", () => {
     }
   });
 
-  it("흐름은 전부 소스에서 부하 방향(forward)이다", () => {
+  /**
+   * flows는 "급전이 도달한 방향"이지 조류의 크기·부호가 아니다.
+   * 백업 경계 안쪽에 전원을 물린 구성(부분 백업, grid support)에서는
+   * 계통 쪽에서 먼저 도달한 도체가 reverse로 잡히는 것이 정상이다 —
+   * 그 도체가 백피드 구간이라는 뜻이다. 크기는 analysis/powerflow가 답한다.
+   */
+  it("모든 전력 엣지가 흐름 방향을 갖는다 (none이 없다)", () => {
     for (const t of topologies) {
       const r = evaluateScenario(t, devices, scen("grid_normal"));
-      expect(Object.values(r.flows).every((f) => f === "forward")).toBe(true);
+      expect(Object.values(r.flows).every((f) => f !== "none")).toBe(true);
+    }
+  });
+
+  it("서비스 인입은 계통 → 집 방향이다", () => {
+    for (const t of topologies) {
+      const r = evaluateScenario(t, devices, scen("grid_normal"));
+      for (const [id, flow] of Object.entries(r.flows)) {
+        if (id.startsWith("svc.line->")) expect(`${t.id}/${id}=${flow}`).toBe(`${t.id}/${id}=forward`);
+      }
     }
   });
 
@@ -108,7 +123,10 @@ describe("블랙스타트", () => {
 
   it("PV DC 회로만 살아 있고 AC측은 전부 사선이다", () => {
     const r = evaluateScenario(tesla, devices, scen("black_start"));
-    expect(liveEdges(r)).toEqual(["pv.dc_out->pw3.pv_dc"]);
+    // 스트링 안의 직렬 결선 + 스트링 종단 → MPPT. AC측은 하나도 살아 있지 않다.
+    expect(liveEdges(r).every((id) => id.startsWith("pv-"))).toBe(true);
+    expect(liveEdges(r)).toContain("pv-10.dc_out->pw3.pv_dc");
+    expect(liveEdges(r)).toContain("pv-20.dc_out->pw3.pv_dc");
   });
 
   it("black_start_capable=true를 넣으면 기동이 성립한다 — 데이터만으로 결과가 바뀐다", () => {
@@ -124,14 +142,16 @@ describe("블랙스타트", () => {
 
 describe("부하 차단 (야간 아일랜딩)", () => {
   it("일몰 후 DC 어레이 회로는 사선이다 — 인버터가 어레이를 역급전하지 않는다", () => {
-    expect(run(tesla, "load_shed").energization["pv.dc_out->pw3.pv_dc"]).toBe("dead");
-    expect(run(enphase, "load_shed").energization["pv.dc_out->micro.dc_in"]).toBe("dead");
+    expect(run(tesla, "load_shed").energization["pv-10.dc_out->pw3.pv_dc"]).toBe("dead");
+    expect(run(enphase, "load_shed").energization["pv-01.dc_out->mi-01.dc_in"]).toBe("dead");
   });
 
   it("마이크로인버터의 AC 도체는 야간에도 활선이다", () => {
     const r = run(enphase, "load_shed");
-    expect(r.energization["micro.ac_out->comb.pv_ac_in"]).toBe("live");
-    expect(r.flows["micro.ac_out->comb.pv_ac_in"]).toBe("reverse");
+    expect(r.energization["mi-10.ac_out->comb.pv_ac_in"]).toBe("live");
+    expect(r.flows["mi-10.ac_out->comb.pv_ac_in"]).toBe("reverse");
+    // 트렁크 구간도 마찬가지다 — 야간에도 AC는 살아 있다.
+    expect(r.energization["mi-01.ac_out->mi-02.trunk_in"]).toBe("live");
   });
 
   it("부하 노드가 없다는 사실을 숨기지 않고 보고한다", () => {

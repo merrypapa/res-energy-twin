@@ -120,3 +120,13 @@ export function symbolFor(cls: DeviceClassName): string {
 export function hasSymbol(cls: DeviceClassName): boolean {
   return cls in SYMBOLS;
 }
+
+/**
+ * 노드 상자 폭. 배열로 반복되는 소자(모듈·마이크로인버터)는 좁게 잡는다 —
+ * 20장을 한 랭크에 늘어놓아야 단선도로 읽힌다. class로만 판정한다.
+ */
+const NARROW: ReadonlySet<DeviceClassName> = new Set(["pv_module", "microinverter"]);
+
+export function isNarrow(cls: DeviceClassName): boolean {
+  return NARROW.has(cls);
+}

@@ -82,7 +82,8 @@ export function compareTopologies(
   add("vendor", "벤더", (c) => c.topology.vendor);
   add("backup_scope", "백업 범위", (c) => backupScope(c.topology));
   add("coupling", "결합 방식", (c) => coupling(c.graph));
-  add("parts", "설치 부품 수", (c) => `${installedParts(c.graph)}종`);
+  // 배열이 1노드 1부품으로 펼쳐진 뒤로 이 값은 실제 설치 개수다 (모듈 20장 = 20개).
+  add("parts", "설치 부품 수", (c) => `${installedParts(c.graph)}개`);
   add("nodes", "노드 수", (c) => `${c.graph.nodes.length}`);
   add("power_edges", "전력 결선 포인트", (c) => `${count(c, "power")}`);
   add("comms_edges", "통신 결선 포인트", (c) => `${count(c, "comms")}`);

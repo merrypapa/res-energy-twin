@@ -23,6 +23,10 @@ export const THEME = {
 
 export const GEO = {
   nodeW: 176,
+  /** 배열 노드(모듈·마이크로인버터) 폭. 20장이 한 랭크에 들어가려면 좁아야 한다. */
+  arrayNodeW: 88,
+  /** 배열 노드끼리의 간격 */
+  arrayColGap: 14,
   nodeH: 88,
   colGap: 40,
   rankGap: 60,

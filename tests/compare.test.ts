@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadTopologies, loadScenarios } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, loadScenarios } from "../src/validate/index.js";
 import { compareTopologies, toMarkdown, UNKNOWN } from "../src/compare/index.js";
 import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library").items;
-const topologies = loadTopologies("topologies").items;
+const topologies = loadPresetTopologies("configurations").items;
 const scenarios = loadScenarios("scenarios").items;
 const outage = scenarios.find((s) => s.id === "outage_islanded")!;
 
@@ -17,22 +17,25 @@ const cell = (c: ReturnType<typeof cmp>, key: string, vendor: string) =>
 
 describe("비교표", () => {
   it("4종이 한 표에 들어간다 — 스프린트 4 완료 기준", () => {
-    const c = cmp();
+    const c = cmp(pick("tesla", "enphase", "solaredge", "qcells"));
     expect(c.columns.map((x) => x.vendor).sort()).toEqual(["Enphase", "Qcells", "SolarEdge", "Tesla"]);
   });
 
   it("모든 행이 열 수와 같은 셀 수를 갖는다", () => {
-    const c = cmp();
+    const c = cmp(pick("tesla", "enphase", "solaredge", "qcells"));
     for (const r of c.rows) expect(`${r.key}:${r.cells.length}`).toBe(`${r.key}:${c.columns.length}`);
   });
 
   it("CLAUDE.md가 자동 비교를 약속한 세 항목이 실제로 계산된다", () => {
     const c = cmp(pick("tesla", "enphase"));
-    // 부품 수 / 서브패널 필요 여부 / 결선 포인트 수
-    expect(cell(c, "parts", "Enphase")).toBe("5종");
-    expect(cell(c, "parts", "Tesla")).toBe("3종");
-    expect(cell(c, "power_edges", "Enphase")).toBe("6");
-    expect(cell(c, "power_edges", "Tesla")).toBe("4");
+    // 부품 수 / 서브패널 필요 여부 / 결선 포인트 수.
+    // 모듈·마이크로인버터를 1대씩 노드로 펼친 뒤로 이 값은 실제 설치 개수다:
+    // 같은 20장 어레이에서 AC 결합은 유닛이 20개 더 붙고 결선 포인트도 그만큼 늘어난다.
+    expect(cell(c, "parts", "Enphase")).toBe("43개");
+    expect(cell(c, "parts", "Tesla")).toBe("22개");
+    expect(Number(cell(c, "power_edges", "Enphase"))).toBeGreaterThan(
+      Number(cell(c, "power_edges", "Tesla")),
+    );
     expect(cell(c, "subpanel", "Enphase")).toBe("불필요");
     expect(cell(c, "subpanel", "Tesla")).toBe("조건부");
   });
@@ -64,7 +67,7 @@ describe("비교표", () => {
   });
 
   it("정격이 없는 전원이 합산에서 빠진 사실을 표시한다", () => {
-    expect(cell(cmp(pick("enphase")), "continuous", "Enphase")).toContain("미기재 1건 제외");
+    expect(cell(cmp(pick("enphase")), "continuous", "Enphase")).toContain("미기재 20건 제외");
   });
 
   it("MID가 확정되지 않은 구성은 그 사실을 노트로 남긴다", () => {
@@ -144,7 +147,7 @@ describe("데이터만으로 제품이 추가된다", () => {
       scenario: outage,
     });
     expect(c.columns.map((x) => x.vendor)).toContain("VendorZ");
-    expect(cell(c, "parts", "VendorZ")).toBe("2종");
+    expect(cell(c, "parts", "VendorZ")).toBe("2개");
     expect(cell(c, "mid", "VendorZ")).toContain("내장");
     expect(cell(c, "island", "VendorZ")).toBe("unit");
     expect(cell(c, "continuous", "VendorZ")).toBe("9 kW");

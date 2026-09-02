@@ -1,23 +1,25 @@
 import { readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadTopologies, validateAll, checkTopology, checkSourcedNumbers } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, validateAll, checkTopology, checkSourcedNumbers } from "../src/validate/index.js";
 import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 
 const devices = loadDevices("device-library");
-const topologies = loadTopologies("topologies");
+const topologies = loadPresetTopologies("configurations");
 
 describe("데이터 로드", () => {
   it("모든 device 파일이 스키마를 통과한다", () => {
     expect(devices.findings.filter((f) => f.severity === "error")).toEqual([]);
     expect(devices.items.length).toBeGreaterThan(0);
   });
-  it("모든 topology 파일이 스키마를 통과한다", () => {
+  it("모든 구성 템플릿이 스키마를 통과하고 프리셋이 빠짐없이 펼쳐진다", () => {
     expect(topologies.findings.filter((f) => f.severity === "error")).toEqual([]);
     // 개수를 상수로 박지 않는다. 데이터 파일 추가만으로 제품이 늘어나는 것이 이 프로젝트의 전제다.
-    // 지켜야 할 것은 "디렉터리의 파일이 하나도 조용히 누락되지 않는다"이다.
-    const files = readdirSync("topologies").filter((f) => f.endsWith(".json"));
-    expect(topologies.items.length).toBe(files.length);
+    // 지켜야 할 것은 "파일도 프리셋도 하나도 조용히 누락되지 않는다"이다.
+    const files = readdirSync("configurations").filter((f) => /\.ya?ml$/.test(f));
+    expect(topologies.templates.length).toBe(files.length);
+    const presets = topologies.templates.reduce((n, t) => n + t.presets.length, 0);
+    expect(topologies.items.length).toBe(presets);
     expect(topologies.items.length).toBeGreaterThan(0);
   });
   it("모든 device 파일이 빠짐없이 로드된다", () => {
