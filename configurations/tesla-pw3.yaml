@@ -1,0 +1,169 @@
+id: tesla-pw3
+vendor: Tesla
+display_name: Tesla Powerwall 3 — DC 결합
+status: draft
+
+options:
+  - id: backup_mode
+    label: 백업 구성
+    kind: enum
+    default: whole_home
+    choices:
+      - value: "none"
+        label: Grid support (백업 없음)
+        note: "MID를 두지 않는 구성. PW3의 requires_one_of를 만족하지 못해 E025가 뜬다 — 데이터상 성립하지 않는 조합이다"
+      - value: partial
+        label: 부분 백업
+        note: "메인 패널 분기 → MID → 백업 서브패널. 백업 부하를 서브패널로 이설해야 한다"
+      - value: whole_home
+        label: 전체 백업
+        note: "미터 소켓 뒤 MID. 전 부하가 아일랜드에 들어온다"
+  - id: mid_device
+    label: 계통 분리 장치
+    kind: enum
+    default: backup_switch
+    choices:
+      - value: backup_switch
+        label: Backup Switch (미터 소켓)
+        note: "미터 소켓 뒤에 들어가 서비스 도체를 끊는다"
+      - value: gateway_3
+        label: Gateway 3 (별치 함체)
+        note: "별치 함체. needs_backup_subpanel=conditional — 부분 백업 구성에 쓰인다"
+  - id: pv_modules
+    label: PV 모듈 수
+    kind: int
+    min: 1
+    max: 40
+    default: 20
+    unit: "장"
+  - id: string_size
+    label: 스트링당 모듈
+    kind: int
+    min: 1
+    max: 20
+    default: 10
+    unit: "장"
+    note: "직렬 모듈 수. 스트링 전압 = 모듈 Vmp × 이 값. MPPT 입력 창 확인 전이다"
+  - id: battery_units
+    label: Powerwall 대수
+    kind: int
+    min: 0
+    max: 4
+    default: 1
+    unit: "대"
+    note: "2대 이상은 병렬 접속. 스트링은 유닛 수만큼 나눠 붙는다"
+
+nodes:
+  - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
+  - ref: bs
+    device: tesla-backup-switch
+    label: Backup Switch (미터 소켓)
+    when: { mid_device: [backup_switch], backup_mode: [partial, whole_home] }
+  - ref: gw
+    device: tesla-gateway-3
+    label: Gateway 3
+    when: { mid_device: [gateway_3], backup_mode: [partial, whole_home] }
+  - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
+  - ref: sub
+    device: generic-backup-subpanel-100a
+    label: 백업 서브패널
+    when: { backup_mode: [partial] }
+  - { ref: pw3, device: tesla-powerwall-3, label: Powerwall 3, count_from: battery_units }
+  - ref: pv
+    device: generic-pv-module-400w
+    label: PV
+    repeat: { count: pv_modules, chunk: string_size }
+
+edges:
+  # ── 계통 인입: 전체 백업 ──────────────────────────────────
+  - from: svc.line
+    to: bs.grid_in
+    when: { mid_device: [backup_switch], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200, note: "서비스 도체. AWG는 사이트 조건" }
+  - from: bs.load_out
+    to: msp.main_lugs
+    when: { mid_device: [backup_switch], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200, note: "MID 하류 — 정전 시 전체 부하가 아일랜드에 포함" }
+  - from: svc.line
+    to: gw.grid_in
+    when: { mid_device: [gateway_3], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: gw.load_out
+    to: msp.main_lugs
+    when: { mid_device: [gateway_3], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+
+  # ── 계통 인입: 부분 백업 / 백업 없음 ──────────────────────
+  - from: svc.line
+    to: msp.main_lugs
+    when: { backup_mode: ["none", partial] }
+    conductor: { ocpd_a: 200, note: "서비스 도체 직결" }
+  - from: msp.branch
+    to: bs.grid_in
+    when: { mid_device: [backup_switch], backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "백업 경계로 가는 피더" }
+  - from: bs.load_out
+    to: sub.feed
+    when: { mid_device: [backup_switch], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: msp.branch
+    to: gw.grid_in
+    when: { mid_device: [gateway_3], backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "백업 경계로 가는 피더" }
+  - from: gw.load_out
+    to: sub.feed
+    when: { mid_device: [gateway_3], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+
+  # ── PV: 직렬 스트링 → MPPT ───────────────────────────────
+  - from: pv.dc_out
+    to: pv.dc_in
+    fanout: chain
+    conductor: { note: "직렬 — 전압이 더해지고 전류는 같다" }
+  - from: pv.dc_out
+    to: pw3.pv_dc
+    fanout: chunk_last
+    conductor: { note: "스트링 종단 → 내장 MPPT 입력" }
+
+  # ── 인버터 출력 ─────────────────────────────────────────
+  - from: pw3.ac_out
+    to: msp.branch
+    fanout: each
+    when: { backup_mode: ["none", whole_home] }
+    conductor: { ocpd_a: 60, note: "부하측 인터커넥션. 버스바 정격 대비 검토 필요" }
+  - from: pw3.ac_out
+    to: sub.branch
+    fanout: each
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: 60, note: "백업 경계 안쪽 인터커넥션" }
+
+  # ── 통신 ────────────────────────────────────────────────
+  - from: pw3.comms_local
+    to: bs.comms
+    layer: comms
+    fanout: first
+    when: { mid_device: [backup_switch], backup_mode: [partial, whole_home] }
+  - from: pw3.comms_local
+    to: gw.comms
+    layer: comms
+    fanout: first
+    when: { mid_device: [gateway_3], backup_mode: [partial, whole_home] }
+
+presets:
+  - id: tesla-pw3-backup-switch-whole-home
+    display_name: "Powerwall 3 + Backup Switch — 전체 백업"
+    options: { backup_mode: whole_home, mid_device: backup_switch, pv_modules: 20, string_size: 10, battery_units: 1 }
+  - id: tesla-pw3-gateway3-partial
+    display_name: "Powerwall 3 + Gateway 3 — 부분 백업"
+    options: { backup_mode: partial, mid_device: gateway_3, pv_modules: 20, string_size: 10, battery_units: 1 }
+    note: "Gateway 3의 needs_backup_subpanel=conditional에서 도출한 골격. 실제 결선 대조 전이다"
+
+sources:
+  - ref: "Tesla Powerwall 3 설치 매뉴얼 결선도"
+    date: null
+    note: "원문 대조 필요"
+todos:
+  - "PW3 병렬 시 스트링 배분과 통신(리더 유닛) 구성 확인 — 현재 첫 유닛만 MID에 연결한다"
+  - "Backup Switch의 CT 배선을 comms 레이어로 둘지 ct_sense 포트로 분리할지 결정"
+  - "string_size 기본 10은 자리값이다. MPPT 입력 전압 창과 저온 Voc를 확인해 정할 것"
+  - "backup_mode=none이 E025로 떨어지는 것이 맞는지 확인 (게이트웨이 없이 grid support 설치가 가능한가)"

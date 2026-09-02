@@ -1,0 +1,22 @@
+id: generic-backup-subpanel-100a
+vendor: generic
+display_name: 백업 서브패널 100A (모델링 기준)
+class: subpanel
+status: verified          # 특정 제품이 아니라 "모델링 기준값"이라는 뜻이다
+ratings:
+  busbar_a: 100
+  main_ocpd_a: 100
+ports:
+  - { id: feed, type: ac_service_line, direction: in }
+  - { id: branch, type: ac_240v_split, direction: bidirectional, max_connections: 20 }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "모델링 기준값 (특정 제품 아님)"
+    date: null
+    note: "부분 백업에서 백업 경계 안쪽 부하를 모으는 패널. 버스바 100A 가정"
+todos:
+  - "부분 백업 구성의 실제 서브패널 정격은 사이트별로 다르다 — 사이트 컨텍스트에서 받도록 할지 결정"

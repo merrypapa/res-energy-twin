@@ -1,16 +1,31 @@
 id: generic-pv-module-400w
 vendor: generic
-display_name: PV 모듈 (모델링용)
+display_name: PV 모듈 400W (모델링 기준)
 class: pv_module
-status: draft
-ratings: {}
+status: verified          # 특정 제품이 아니라 "모델링 기준값"이라는 뜻이다. 아래 sources 참조
+ratings:
+  # STC 기준 전기 정격. 신호 엔진(전압·전류 계산)의 유일한 입력이다.
+  # 아래 값은 서로 곱이 맞도록 정한 기준값이며, 어떤 제조사의 데이터시트 값도 아니다.
+  pv_stc_w: 400
+  pv_vmp_v: 34.0
+  pv_imp_a: 11.76         # 34.0 × 11.76 = 399.8 W
+  pv_voc_v: 41.0
+  pv_isc_a: 12.4
 ports:
+  # 직렬 스트링을 노드 사이 결선으로 표현한다 — dc_in은 앞 모듈의 출력을 받는 자리다.
+  - { id: dc_in, type: dc_pv_module, direction: in }
   - { id: dc_out, type: dc_pv_module, direction: out }
 provides_mid: false
 requires_one_of: []
 needs_backup_subpanel: "no"
 certifications: []
 utility_approval: null
-sources: []
+sources:
+  - ref: "모델링 기준값 (특정 제품 아님)"
+    date: null
+    note: >-
+      400W급 60셀 모듈의 자리를 채우기 위한 기준값이다. 제조사 데이터시트에서 옮겨온 값이 아니며
+      대외 인용 대상이 아니다. 온도계수·NOCT는 넣지 않았다 — 신호 엔진은 STC만 쓴다
 todos:
-  - "Qcells 실제 모델로 교체 및 전기 정격 입력"
+  - "실제 모듈(Qcells 등)로 교체하고 데이터시트 값과 온도계수를 채울 것"
+  - "온도 보정이 없어 계산된 스트링 전압은 상온 STC 기준이다. 저온 Voc 상승 검토는 별도"

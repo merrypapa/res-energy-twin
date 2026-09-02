@@ -1,0 +1,157 @@
+id: qcells-g4
+vendor: Qcells
+display_name: Qcells G4 ESS — MSC / 게이트웨이 구성 (골격)
+status: draft
+
+options:
+  - id: backup_mode
+    label: 백업 구성
+    kind: enum
+    default: whole_home
+    choices:
+      - value: "none"
+        label: Grid support (백업 없음)
+        note: "계통 분리 장치를 두지 않는다. G4 ESS의 requires_one_of(MSC)를 만족하지 못한다"
+      - value: partial
+        label: 부분 백업
+        note: "분리 장치 부하측에 백업 서브패널"
+      - value: whole_home
+        label: 전체 백업
+        note: "서비스 도체 위 분리 장치"
+  - id: controller
+    label: 계통 분리 장치
+    kind: enum
+    default: msc
+    choices:
+      - value: msc
+        label: G4 MSC
+        note: "역할 미확정 — 현재 class를 mid로 임시 분류했다"
+      - value: gateway
+        label: 게이트웨이/허브 (제품 미확정)
+        note: "MSC 대신 별치 게이트웨이를 두는 구성. 자리표시자 MID로 표현한다"
+  - id: pv_modules
+    label: PV 모듈 수
+    kind: int
+    min: 1
+    max: 40
+    default: 20
+    unit: "장"
+  - id: string_size
+    label: 스트링당 모듈
+    kind: int
+    min: 1
+    max: 20
+    default: 10
+    unit: "장"
+  - id: ess_units
+    label: G4 ESS 대수
+    kind: int
+    min: 0
+    max: 3
+    default: 1
+    unit: "대"
+
+nodes:
+  - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
+  - ref: msc
+    device: qcells-g4-msc
+    label: G4 MSC (역할 미확정)
+    when: { controller: [msc], backup_mode: [partial, whole_home] }
+  - ref: gw
+    device: generic-mid-placeholder
+    label: 게이트웨이 (제품 미확정)
+    when: { controller: [gateway], backup_mode: [partial, whole_home] }
+  - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
+  - ref: sub
+    device: generic-backup-subpanel-100a
+    label: 백업 서브패널
+    when: { backup_mode: [partial] }
+  - { ref: ess, device: qcells-g4-ess, label: G4 ESS, count_from: ess_units }
+  - ref: pv
+    device: generic-pv-module-400w
+    label: PV
+    repeat: { count: pv_modules, chunk: string_size }
+
+edges:
+  - from: svc.line
+    to: msc.grid_in
+    when: { controller: [msc], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: msc.load_out
+    to: msp.main_lugs
+    when: { controller: [msc], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: svc.line
+    to: gw.grid_in
+    when: { controller: [gateway], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: gw.load_out
+    to: msp.main_lugs
+    when: { controller: [gateway], backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+
+  - from: svc.line
+    to: msp.main_lugs
+    when: { backup_mode: ["none", partial] }
+    conductor: { ocpd_a: 200 }
+  - from: msp.branch
+    to: msc.grid_in
+    when: { controller: [msc], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: msc.load_out
+    to: sub.feed
+    when: { controller: [msc], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: msp.branch
+    to: gw.grid_in
+    when: { controller: [gateway], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: gw.load_out
+    to: sub.feed
+    when: { controller: [gateway], backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+
+  - from: pv.dc_out
+    to: pv.dc_in
+    fanout: chain
+    conductor: { note: "직렬 — 전압이 더해진다" }
+  - from: pv.dc_out
+    to: ess.pv_dc
+    fanout: chunk_last
+    conductor: { note: "스트링 종단 → ESS MPPT" }
+
+  - from: ess.ac_out
+    to: msp.branch
+    fanout: each
+    when: { backup_mode: ["none", whole_home] }
+    conductor: { ocpd_a: null, note: "백피드 OCPD 미기재" }
+  - from: ess.ac_out
+    to: sub.branch
+    fanout: each
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+
+  - from: ess.comms
+    to: msc.comms
+    layer: comms
+    fanout: first
+    when: { controller: [msc], backup_mode: [partial, whole_home] }
+  - from: ess.comms
+    to: gw.comms
+    layer: comms
+    fanout: first
+    when: { controller: [gateway], backup_mode: [partial, whole_home] }
+
+presets:
+  - id: qcells-g4-msc-whole-home
+    display_name: "G4 ESS + MSC — 전체 백업 (골격)"
+    options: { backup_mode: whole_home, controller: msc, pv_modules: 20, string_size: 10, ess_units: 1 }
+
+sources:
+  - ref: "CLAUDE.md §3.3 — 'Qcells G4 ESS (MSC/MID 구성). 내부 사양 기준'"
+    date: null
+    note: "이 골격은 위 한 줄에서만 도출됐다. 내부 사양 문서 대조 전이다"
+todos:
+  - "MSC의 역할이 확정되면 노드 구성이 바뀐다 (계량/결합이 분리될 가능성)"
+  - "게이트웨이 선택지는 구조만 표현한 것이다. 실제 제품 라인업 확인 전이다"
+  - "전 수치 null 유지 — 내부 사양 확인 전까지 신호 계산이 성립하지 않는다"

@@ -1,0 +1,149 @@
+id: enphase-4g
+vendor: Enphase
+display_name: Enphase 4세대 — IQ8 + IQ Battery + Combiner 6C
+status: draft
+
+# 옵션 축. 여기 선언된 것만 UI에 나오고, 조합은 컴포저가 만든다.
+options:
+  - id: backup_mode
+    label: 백업 구성
+    kind: enum
+    default: whole_home
+    choices:
+      - value: "none"
+        label: Grid support (백업 없음)
+        note: "MID 없이 계통에 병렬 접속만 한다. 정전 시 백업 경계가 없어 전 부하가 사선이다"
+      - value: partial
+        label: 부분 백업
+        note: "메인 패널 분기에서 컨트롤러를 거쳐 백업 서브패널을 먹인다. Enphase 제품 구성은 미확인 — 자리표시자 MID로 표현한다"
+      - value: whole_home
+        label: 전체 백업
+        note: "IQ Meter Collar가 미터 위치 MID다. 백업 서브패널도 부하 재배선도 없다"
+  - id: pv_modules
+    label: PV 모듈 수
+    kind: int
+    min: 1
+    max: 40
+    default: 20
+    unit: "장"
+    note: "모듈 1장 = 마이크로인버터 1대. 두 개수는 항상 같다"
+  - id: branch_size
+    label: 분기회로당 유닛
+    kind: int
+    min: 1
+    max: 20
+    default: 10
+    unit: "대"
+    note: "AC 트렁크 하나에 매다는 마이크로인버터 수. 기본 10은 자리값이며 제조사 한도 확인 전이다"
+  - id: battery_units
+    label: IQ Battery 대수
+    kind: int
+    min: 0
+    max: 4
+    default: 1
+    unit: "대"
+    note: "0 = 배터리 없는 PV 전용 구성. 2대 이상은 확장(병렬) 접속이다"
+
+nodes:
+  - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
+  - ref: collar
+    device: enphase-iq-meter-collar
+    label: IQ Meter Collar (MID)
+    when: { backup_mode: [whole_home] }
+  - ref: ctrl
+    device: generic-mid-placeholder
+    label: 백업 컨트롤러 (제품 미확정)
+    when: { backup_mode: [partial] }
+  - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
+  - ref: sub
+    device: generic-backup-subpanel-100a
+    label: 백업 서브패널
+    when: { backup_mode: [partial] }
+  - { ref: comb, device: enphase-iq-combiner-6c, label: IQ Combiner 6C }
+  - { ref: batt, device: enphase-iq-battery-10c, label: IQ Battery 10C, count_from: battery_units }
+  - ref: pv
+    device: generic-pv-module-400w
+    label: PV
+    repeat: { count: pv_modules, chunk: branch_size }
+  - ref: mi
+    device: enphase-iq8-microinverter
+    label: IQ8
+    repeat: { count: pv_modules, chunk: branch_size }
+
+edges:
+  # ── 계통 인입 ────────────────────────────────────────────
+  - from: svc.line
+    to: collar.grid_in
+    when: { backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200, note: "미터 소켓 — 유틸리티 승인 대상" }
+  - from: collar.load_out
+    to: msp.main_lugs
+    when: { backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200, note: "MID가 미터 위치에 있어 전체 부하가 아일랜드에 포함된다" }
+  - from: svc.line
+    to: msp.main_lugs
+    when: { backup_mode: ["none", partial] }
+    conductor: { ocpd_a: 200, note: "서비스 도체 직결 — 이 지점 상류에는 개폐 주체가 없다" }
+  - from: msp.branch
+    to: ctrl.grid_in
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "백업 경계로 가는 피더. OCPD는 백업 부하 합계에서 산출" }
+  - from: ctrl.load_out
+    to: sub.feed
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "MID 부하측 — 이 아래만 아일랜드에 들어온다" }
+
+  # ── PV: 모듈 1장 : 마이크로인버터 1대 ─────────────────────
+  - from: pv.dc_out
+    to: mi.dc_in
+    fanout: pairwise
+    conductor: { note: "모듈 단위 DC. 직렬 스트링이 없어 어레이 DC 전압이 존재하지 않는다" }
+  - from: mi.ac_out
+    to: mi.trunk_in
+    fanout: chain
+    conductor: { note: "AC 트렁크 — 하류로 갈수록 유닛 전류가 누적된다" }
+  - from: mi.ac_out
+    to: comb.pv_ac_in
+    fanout: chunk_last
+    conductor: { ocpd_a: null, note: "분기회로 종단 → 결합반 차단기. OCPD는 유닛 수 × 유닛 전류에서 산출" }
+
+  # ── 결합 · 축전지 ────────────────────────────────────────
+  - from: comb.main_ac
+    to: msp.branch
+    when: { backup_mode: ["none", whole_home] }
+    conductor: { ocpd_a: null, note: "부하측 인터커넥션 — 버스바 정격 대비 검토 대상" }
+  - from: comb.main_ac
+    to: sub.branch
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "백업 경계 안쪽 인터커넥션" }
+  - from: batt.ac_out
+    to: comb.battery_ac
+    fanout: each
+    conductor: { ocpd_a: null }
+
+  # ── 통신 ────────────────────────────────────────────────
+  - { from: batt.comms, to: comb.comms, layer: comms, fanout: each }
+  - { from: collar.comms, to: comb.comms, layer: comms, when: { backup_mode: [whole_home] } }
+  - { from: ctrl.comms, to: comb.comms, layer: comms, when: { backup_mode: [partial] } }
+
+presets:
+  - id: enphase-4g-meter-collar-whole-home
+    display_name: "IQ Battery 10C + Combiner 6C + Meter Collar — 전체 백업"
+    options: { backup_mode: whole_home, pv_modules: 20, branch_size: 10, battery_units: 1 }
+    note: "CLAUDE.md §3.3의 기준 구성. 미터 컬러가 MID라 서브패널이 없다"
+  - id: enphase-4g-grid-support-pv-only
+    display_name: "IQ8 어레이만 — Grid support (백업 없음)"
+    options: { backup_mode: "none", pv_modules: 20, branch_size: 10, battery_units: 0 }
+    note: >-
+      배터리를 0으로 둔 이유는 IQ Battery의 requires_one_of가 IQ Meter Collar를 요구하기 때문이다.
+      배터리를 넣고 backup_mode=none을 고르면 E025가 뜬다 — 그 판정이 맞는지는 확인 대상이다
+
+sources:
+  - ref: "Enphase 4세대 시스템 구성 문서 / IQ Meter Collar 제품 페이지"
+    date: "2026-08"
+    note: "결선 세부는 설치 매뉴얼 대조 필요"
+todos:
+  - "부분 백업의 실제 Enphase 제품 구성(컨트롤러 모델) 확인. 현재는 generic-mid-placeholder다"
+  - "분기회로당 최대 유닛 수 및 분기 OCPD 확인 — branch_size 기본값에 근거가 없다"
+  - "IQ Gateway를 별도 노드로 분리할지 결정"
+  - "배터리 2대 이상의 실제 접속(결합반 회로 분리 여부) 확인"

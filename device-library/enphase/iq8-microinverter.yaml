@@ -6,6 +6,9 @@ status: draft
 ratings: {}
 ports:
   - { id: dc_in, type: dc_pv_module, direction: in }
+  # AC 트렁크를 노드 사이 결선으로 표현한다. trunk_in은 앞 유닛에서 오는 트렁크,
+  # ac_out은 자기 출력 + 앞 유닛들의 통과분을 함께 싣는 구간이다.
+  - { id: trunk_in, type: ac_240v_split, direction: in }
   - { id: ac_out, type: ac_240v_split, direction: out }
 provides_mid: false
 grid_forming: null          # TODO: IQ8 계열 그리드 포밍 여부는 모델별 상이. 매뉴얼 확인 전까지 미확정
@@ -16,5 +19,8 @@ certifications: []
 utility_approval: null
 sources: []
 todos:
+  - "연속 AC 출력(W)·최대 입력 DC(W)·CEC 효율 미확인 — null 유지. 신호 엔진은 클리핑을 판정하지 않는다"
+  - "분기회로당 최대 유닛 수 확인 (템플릿 branch_size 기본 10은 근거 없는 자리값이다)"
+  - "trunk_in/ac_out 분리는 트렁크 구간 전류를 표현하기 위한 모델링이다. 실제 함체 포트는 커넥터 1쌍이다"
   - "스텁 파일. 모델별(IQ8+/8M/8A 등) 정격 분리 필요"
   - "grid_forming 확인. null인 동안 엔진은 아일랜드에서 이 장치를 소스로 쓰지 않는다"

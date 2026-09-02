@@ -1,0 +1,121 @@
+id: solaredge-nexis
+vendor: SolarEdge
+display_name: SolarEdge Nexis 계열 — DC 결합 (골격)
+status: draft
+
+options:
+  - id: backup_mode
+    label: 백업 구성
+    kind: enum
+    default: whole_home
+    choices:
+      - value: "none"
+        label: Grid support (백업 없음)
+        note: "MID 없이 계통 병렬 접속만"
+      - value: partial
+        label: 부분 백업
+        note: "MID 부하측에 백업 서브패널"
+      - value: whole_home
+        label: 전체 백업
+        note: "서비스 도체 위 MID. 제품이 이 구성을 지원하는지 확인 전이다"
+  - id: pv_modules
+    label: PV 모듈 수
+    kind: int
+    min: 1
+    max: 40
+    default: 20
+    unit: "장"
+  - id: string_size
+    label: 스트링당 모듈
+    kind: int
+    min: 1
+    max: 20
+    default: 10
+    unit: "장"
+  - id: inverter_units
+    label: 하이브리드 인버터 대수
+    kind: int
+    min: 0
+    max: 3
+    default: 1
+    unit: "대"
+    note: "2대 이상은 병렬. 스트링은 유닛 수만큼 나눠 붙는다"
+
+nodes:
+  - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
+  - ref: mid
+    device: generic-mid-placeholder
+    label: MID (제품 미확정)
+    when: { backup_mode: [partial, whole_home] }
+  - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
+  - ref: sub
+    device: generic-backup-subpanel-100a
+    label: 백업 서브패널
+    when: { backup_mode: [partial] }
+  - { ref: inv, device: solaredge-nexis-hybrid, label: Nexis 하이브리드, count_from: inverter_units }
+  - ref: pv
+    device: generic-pv-module-400w
+    label: PV
+    repeat: { count: pv_modules, chunk: string_size }
+
+edges:
+  - from: svc.line
+    to: mid.grid_in
+    when: { backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: mid.load_out
+    to: msp.main_lugs
+    when: { backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200 }
+  - from: svc.line
+    to: msp.main_lugs
+    when: { backup_mode: ["none", partial] }
+    conductor: { ocpd_a: 200 }
+  - from: msp.branch
+    to: mid.grid_in
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: mid.load_out
+    to: sub.feed
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+
+  - from: pv.dc_out
+    to: pv.dc_in
+    fanout: chain
+    conductor: { note: "직렬 — 전압이 더해진다" }
+  - from: pv.dc_out
+    to: inv.pv_dc
+    fanout: chunk_last
+    conductor: { note: "스트링 종단 → 인버터 MPPT 직결" }
+
+  - from: inv.ac_out
+    to: msp.branch
+    fanout: each
+    when: { backup_mode: ["none", whole_home] }
+    conductor: { ocpd_a: null, note: "백피드 OCPD 미기재 — 연속 출력 확인 후 산출" }
+  - from: inv.ac_out
+    to: sub.branch
+    fanout: each
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+
+  - from: inv.comms
+    to: mid.comms
+    layer: comms
+    fanout: first
+    when: { backup_mode: [partial, whole_home] }
+
+presets:
+  - id: solaredge-dc-coupled-whole-home
+    display_name: "Nexis 계열 DC 결합 — 전체 백업 (골격)"
+    options: { backup_mode: whole_home, pv_modules: 20, string_size: 10, inverter_units: 1 }
+
+sources:
+  - ref: "CLAUDE.md §3.3 — 'SolarEdge(Nexis 계열): DC 결합, 스트링 구조'"
+    date: null
+    note: "이 골격은 위 한 줄에서만 도출됐다. 제품 문서 대조 전이다"
+todos:
+  - "전체 백업을 가정해 모델링했다. 실제 제품이 이 구성을 지원하는지 확인 후 backup_scope 확정"
+  - "MID 자리표시자를 실제 제품으로 교체"
+  - "DC 결합 축전지를 별도 노드로 분리할지 결정 — 현재 인버터에 합쳐져 있다"
