@@ -9,6 +9,14 @@ const PAIRS: ReadonlyArray<readonly [string, string]> = [
   ["dc_pv_module", "dc_string"],
   ["dc_string", "dc_string"],
   ["ac_service_line", "ac_service_line"],
+  /**
+   * 서비스 도체 ↔ 240V 분기. 전기적으로는 같은 단상 3선 120/240V다.
+   * 부분 백업에서 메인 패널의 분기 차단기가 MID/컨트롤러를 먹이는 구성이 실제로 있어
+   * 연결 자체는 허용한다. 공급측 탭이냐 부하측 인터커넥션이냐의 구분은
+   * 연결 가능 여부가 아니라 룰 엔진(rules/supply-side-tap)이 판정한다.
+   * TODO: 도체 등급(서비스/피더/분기)을 별도 필드로 분리하면 이 예외를 없앨 수 있다.
+   */
+  ["ac_service_line", "ac_240v_split"],
   ["ac_240v_split", "ac_240v_split"],
   ["ac_240v_split", "ac_120v_branch"],
   ["ac_120v_branch", "ac_120v_branch"],

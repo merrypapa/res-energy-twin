@@ -10,6 +10,12 @@ export const TopologyNode = z
     device: z.string().min(1),
     label: z.string().nullable().default(null),
     count: z.number().int().positive().default(1),
+    /**
+     * 배열 그룹 id. 같은 그룹의 노드는 같은 랭크에 나란히 놓이고, 그룹 안의
+     * 결선(직렬 스트링 · AC 트렁크)은 수평으로 그려진다. 컴포저가 채운다.
+     * null = 단독 노드.
+     */
+    group: z.string().nullable().default(null),
   })
   .strict();
 

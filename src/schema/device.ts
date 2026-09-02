@@ -30,11 +30,18 @@ export const PortType = z.enum([
   "ct_sense",
 ]);
 
+export type PortType = z.infer<typeof PortType>;
+
 export const Port = z.object({
   id: z.string().min(1),
   type: PortType,
   direction: z.enum(["in", "out", "bidirectional"]),
-  max_connections: z.number().int().positive().default(1),
+  /**
+   * 이 포트에 붙일 수 있는 최대 도체 수. null = 미확인.
+   * 기본값을 1로 두면 "확인하지 않았다"가 "1개만 된다"는 주장으로 굳는다 —
+   * 검증기는 null을 한도 위반으로 판정하지 않고 미확인으로 보고한다.
+   */
+  max_connections: z.number().int().positive().nullable().default(null),
   /** 이 포트에 요구되는 과전류 보호 정격. 모르면 null. */
   ocpd_a: z.number().positive().nullable().default(null),
   /**
@@ -57,6 +64,15 @@ export const Ratings = z
     pv_mppt_count: z.number().int().positive().nullable().default(null),
     max_pv_dc_kw: z.number().positive().nullable().default(null),
     busbar_a: z.number().positive().nullable().default(null),
+    /**
+     * PV 모듈 전기 정격 (STC). 신호 계산(전압·전류)의 유일한 입력이다.
+     * 모르면 null — 엔진은 계산을 포기하고 finding을 남긴다. 추정치로 채우지 않는다.
+     */
+    pv_stc_w: z.number().positive().nullable().default(null),
+    pv_vmp_v: z.number().positive().nullable().default(null),
+    pv_imp_a: z.number().positive().nullable().default(null),
+    pv_voc_v: z.number().positive().nullable().default(null),
+    pv_isc_a: z.number().positive().nullable().default(null),
     main_ocpd_a: z.number().positive().nullable().default(null),
     service_a: z.number().positive().nullable().default(null),
   })
