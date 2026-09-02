@@ -49,9 +49,11 @@ export function checkTopology(t: Topology, devices: Device[]): Finding[] {
       continue;
     }
     nodeDevice.set(n.ref, d);
-    if (d.status === "draft") {
-      findings.push(info("I020", `draft 상태 device 사용: ${d.id}`, `${t.id}#${n.ref}`));
-    }
+  }
+
+  // draft 보고는 device 단위로 한 번만. 배열이 20노드로 펼쳐졌다고 같은 경고를 20번 내지 않는다.
+  for (const id of new Set([...nodeDevice.values()].filter((d) => d.status === "draft").map((d) => d.id))) {
+    findings.push(info("I020", `draft 상태 device 사용: ${id}`, t.id));
   }
 
   const usage = new Map<string, number>();
@@ -87,12 +89,21 @@ export function checkTopology(t: Topology, devices: Device[]): Finding[] {
     }
   }
 
+  const unknownLimit = new Set<string>();
   for (const [key, n] of usage) {
     const [nodeRef, portId] = key.split(".") as [string, string];
-    const port = nodeDevice.get(nodeRef)?.ports.find((p) => p.id === portId);
-    if (port && n > port.max_connections) {
+    const dev = nodeDevice.get(nodeRef);
+    const port = dev?.ports.find((p) => p.id === portId);
+    if (!port || n <= 1) continue;
+    if (port.max_connections === null) {
+      // 한도를 모르는 포트에 여러 도체를 물렸다. 위반이라고 단정하지 않고 확인 대상으로 남긴다.
+      unknownLimit.add(`${dev!.id}.${portId}`);
+    } else if (n > port.max_connections) {
       findings.push(err("E024", `포트 연결 수 초과: ${n} > ${port.max_connections}`, `${t.id}#${key}`));
     }
+  }
+  for (const key of [...unknownLimit].sort()) {
+    findings.push(warn("W026", `포트 연결 수 한도 미확인(max_connections=null)인데 여러 도체를 물렸다: ${key}`, t.id));
   }
 
   // requires_one_of

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { loadDevices, loadTopologies } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies } from "../src/validate/index.js";
 import { runRules } from "../src/rules/engine.js";
 import { EMPTY_SITE, SiteContext } from "../src/schema/rule.js";
 
@@ -26,7 +26,7 @@ if (sitePath) {
 }
 
 const devices = loadDevices("device-library");
-const topologies = loadTopologies("topologies");
+const topologies = loadPresetTopologies("configurations");
 
 const blocking = [...devices.findings, ...topologies.findings].filter((f) => f.severity === "error");
 if (blocking.length > 0) {

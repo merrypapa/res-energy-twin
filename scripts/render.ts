@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { loadDevices, loadTopologies, loadScenarios } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, loadScenarios } from "../src/validate/index.js";
 import { renderTopology } from "../src/render/index.js";
 import { evaluateScenario } from "../src/scenario/index.js";
 import type { Layer } from "../src/schema/common.js";
@@ -24,7 +24,7 @@ const scenarioArg = flag("scenario");
 const open = (flag("open") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 const devices = loadDevices("device-library");
-const topologies = loadTopologies("topologies");
+const topologies = loadPresetTopologies("configurations");
 const scenarios = loadScenarios("scenarios");
 
 const blocking = [...devices.findings, ...topologies.findings, ...scenarios.findings].filter(

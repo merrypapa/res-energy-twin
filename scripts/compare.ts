@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { loadDevices, loadTopologies, loadScenarios } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, loadScenarios } from "../src/validate/index.js";
 import { compareTopologies, toMarkdown } from "../src/compare/index.js";
 import { EMPTY_SITE, SiteContext } from "../src/schema/rule.js";
 
@@ -15,7 +15,7 @@ const flag = (n: string): string | null => {
 const has = (n: string) => args.includes(`--${n}`);
 
 const devices = loadDevices("device-library");
-const topologies = loadTopologies("topologies");
+const topologies = loadPresetTopologies("configurations");
 const scenarios = loadScenarios("scenarios");
 
 const blocking = [...devices.findings, ...topologies.findings, ...scenarios.findings].filter(
