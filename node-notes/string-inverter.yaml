@@ -1,0 +1,21 @@
+id: note-string-inverter
+applies_to: { class: string_inverter, device: null }
+role: 스트링 전체의 DC를 한 곳에서 AC로 바꾼다. MPPT는 스트링(또는 MPPT 입력) 단위다.
+design_points:
+  - title: 입력 전압 창이 스트링 길이를 정한다
+    body: >-
+      MPPT는 정해진 전압 범위 안에서만 동작한다. 스트링이 짧으면 흐린 날 창 아래로
+      떨어지고, 길면 저온에서 최대 시스템 전압을 넘는다. 스트링 길이는 이 두 경계 사이에서만
+      고를 수 있다.
+    formula: "V_mppt,min ≤ n · V_mp ≤ V_mppt,max,  n · V_oc(저온) ≤ V_sys,max"
+  - title: 단일 고장점이자 단일 계측점
+    body: >-
+      변환이 한 곳에 모이므로 부품 수와 결선 포인트가 적다. 대신 이 함체가 서면
+      어레이 전체가 선다. 마이크로인버터 구성과의 차이는 비교표의 부품 수·결선 포인트에
+      그대로 나온다.
+sources:
+  - ref: "사내 정리 — 회로 일반 성질 및 단선도 관례"
+    date: "2026-09"
+    note: "제품 스펙이 아니라 회로의 성질이다. 코드 조항은 전부 원문 대조 전(verified=false)"
+todos:
+  - "MPPT 입력 전압 창을 device 스키마에 넣고 스트링 길이 룰을 만들 것"

@@ -1,0 +1,19 @@
+id: note-combiner
+applies_to: { class: combiner, device: null }
+role: 여러 분기회로를 하나의 모선에 모아 패널로 내보낸다. 계측 CT가 함께 들어가는 자리이기도 하다.
+design_points:
+  - title: 합류점의 전류는 분기 전류의 합이다
+    body: >-
+      각 분기회로가 실어 온 전류가 여기서 더해져 한 회선으로 나간다. 이 지점의 전류가
+      결합반 모선 정격과 상류 OCPD를 정한다.
+    formula: "I_out = Σ I_branch"
+  - title: 내부 차단기 자리 수가 확장 한도다
+    body: >-
+      분기회로 수와 축전지 회로 수의 합이 함체가 가진 자리 수를 넘을 수 없다.
+      포트의 max_connections가 그 자리 수이며, 미확인이면 엔진은 한도 위반을 판정하지 않고
+      확인 대상으로 남긴다.
+sources:
+  - ref: "사내 정리 — 회로 일반 성질 및 단선도 관례"
+    date: "2026-09"
+    note: "제품 스펙이 아니라 회로의 성질이다. 코드 조항은 전부 원문 대조 전(verified=false)"
+todos: []

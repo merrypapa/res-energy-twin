@@ -50,25 +50,64 @@ sources:
 
 ## 새 구성 추가
 
-`topologies/<slug>.json` 하나를 만든다. 노드는 device 인스턴스, 엣지는 도체다.
+`configurations/<slug>.yaml` 하나를 만든다. 옵션 축을 선언하면 UI 선택지가 그대로 생긴다.
+컴포저가 `(템플릿, 옵션) => Topology`로 편다.
 
-```json
-{
-  "id": "vendor-config-whole-home",
-  "vendor": "Vendor",
-  "display_name": "제품 조합 — 전체 백업",
-  "status": "draft",
-  "backup_scope": "whole_home",
-  "nodes": [{ "ref": "svc", "device": "generic-utility-service-200a" }],
-  "edges": [{ "from": "svc.line", "to": "mid.grid_in", "layer": "power",
-             "conductor": { "ocpd_a": 200 } }]
-}
+```yaml
+id: vendor-config
+vendor: Vendor
+display_name: 제품 조합
+status: draft
+options:
+  - { id: backup_mode, label: 백업 구성, kind: enum, default: whole_home,
+      choices: [{ value: "none", label: "Grid support (백업 없음)" },
+                { value: whole_home, label: 전체 백업 }] }
+  - { id: pv_modules, label: PV 모듈 수, kind: int, min: 1, max: 40, default: 20 }
+nodes:
+  - { ref: svc, device: generic-utility-service-200a }
+  - { ref: mid, device: vendor-mid, when: { backup_mode: [whole_home] } }
+  - { ref: pv, device: generic-pv-module-400w, repeat: { count: pv_modules, chunk: string_size } }
+edges:
+  - { from: svc.line, to: mid.grid_in, when: { backup_mode: [whole_home] },
+      conductor: { ocpd_a: 200 } }
+  - { from: pv.dc_out, to: pv.dc_in, fanout: chain }        # 직렬 스트링
+  - { from: pv.dc_out, to: inv.pv_dc, fanout: chunk_last }  # 스트링 종단 → MPPT
+presets:
+  - { id: vendor-config-whole-home, display_name: "제품 조합 — 전체 백업",
+      options: { backup_mode: whole_home } }
 ```
 
 - 엣지는 `노드ref.포트id` 형식이다. 포트 **타입**이 맞아야 연결된다 (`src/schema/compat.ts`)
 - 레이어는 `power` / `comms` / `physical`
+- `when`은 `{ 축: [값] }` 매칭뿐이다(키가 여럿이면 AND). 표현식을 쓰지 않는다
+- 노드를 `when`으로 가렸으면 그 노드를 쓰는 엣지에도 같은 `when`을 달아라. 아니면 `C020`
+- `fanout`: `single` · `pairwise`(i↔i) · `chain`(i→i+1, 묶음 경계를 넘지 않는다) ·
+  `chunk_last`(묶음 종단 → 도착지) · `each` · `first`(대표 유닛만)
+- **배열은 축약하지 않는다.** 모듈 20장은 `repeat`으로 20노드가 된다.
+  `count: 20`으로 뭉치면 부품 수·결선 포인트·신호 계산이 전부 틀어진다
 - MID를 내장한 장치라면 포트에 `mid_side: grid | load` 를 달아라.
   없으면 엔진이 아일랜드 경계를 그리지 못해 백업 결과가 실제보다 작게 나온다
+- 프리셋은 데이터 검증 error가 없어야 한다. 성립하지 않는 조합은 축에 남겨 두되
+  프리셋으로 만들지 않는다 — 그 판정을 보여주는 것이 이 도구의 목적이다
+
+## 노드 노트 추가
+
+`node-notes/<slug>.yaml` 하나를 만든다. class 단위가 기본이고, 특정 제품에만 해당하면
+`applies_to.device`로 붙인다. 수식은 기호만 적는다 — 숫자는 신호 엔진이 계산해 채운다.
+
+```yaml
+id: note-my-class
+applies_to: { class: combiner, device: null }
+role: 여러 분기회로를 하나의 모선에 모은다.
+design_points:
+  - title: 합류점의 전류는 분기 전류의 합이다
+    body: "..."
+    formula: "I_out = Σ I_branch"
+    code_ref: "NEC 705.12(B) 계열 — 원문 대조 필요"   # 조항은 기억으로 쓰지 않는다
+    verified: false
+sources:
+  - { ref: "...", date: "2026-09", note: null }
+```
 
 ## device class
 

@@ -315,11 +315,16 @@ function diagnose(
   const out: Finding[] = [];
 
   if (sc.grid === "absent") {
+    // 같은 제품이 20대 있어도 미확인 스펙 경고는 한 번이면 된다.
+    // 배열이 노드로 펼쳐진 뒤로 device 단위 중복 제거가 필요해졌다.
+    const reported = new Set<string>();
+    const once = (key: string): boolean => (reported.has(key) ? false : (reported.add(key), true));
     for (const n of graph.nodes) {
       if (
         n.device.provides_mid === true &&
         isInverter(n) &&
-        !n.device.ports.some((p) => p.mid_side !== null)
+        !n.device.ports.some((p) => p.mid_side !== null) &&
+        once(`S024/${n.device.id}`)
       ) {
         out.push({
           severity: "warning",
@@ -330,7 +335,7 @@ function diagnose(
           where,
         });
       }
-      if (n.device.provides_mid === null) {
+      if (n.device.provides_mid === null && once(`S023/${n.device.id}`)) {
         out.push({
           severity: "warning",
           code: "S023",
@@ -338,7 +343,7 @@ function diagnose(
           where,
         });
       }
-      if (!isInverter(n) || n.device.grid_forming !== null) continue;
+      if (!isInverter(n) || n.device.grid_forming !== null || !once(`S020/${n.device.id}`)) continue;
       out.push({
         severity: "warning",
         code: "S020",
@@ -381,10 +386,15 @@ function diagnose(
 
   const dead = graph.nodes.filter((n) => nodes[n.ref] === "dead").map((n) => n.ref);
   if (dead.length > 0) {
+    // 배열이 통째로 사선이면 40개를 나열해도 읽히지 않는다. 앞쪽만 적고 수를 밝힌다.
+    const shown = dead.slice(0, 8).join(", ");
     out.push({
       severity: "info",
       code: "S040",
-      message: `사선 노드: ${dead.join(", ")}`,
+      message:
+        dead.length > 8
+          ? `사선 노드 ${dead.length}개: ${shown} 외 ${dead.length - 8}개`
+          : `사선 노드: ${shown}`,
       where,
     });
   }

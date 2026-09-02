@@ -1,0 +1,19 @@
+id: note-service-point
+applies_to: { class: service_point, device: null }
+role: 유틸리티 인입점. 계통이 있는 시나리오에서 전력 수지의 상류 끝이다.
+design_points:
+  - title: 여기서의 전력 부호가 수전/수출을 가른다
+    body: >-
+      부하보다 발전이 크면 이 지점의 전력이 음이 된다 — 수출이다. 신호로 보면 전압은
+      그대로고 전류의 위상이 180° 뒤집힌다. 순시 전력 파형의 평균이 음으로 내려간다.
+    formula: "P_grid = P_load − P_pv − P_battery"
+  - title: 공급측 탭은 부하측 인터커넥션과 판정이 다르다
+    body: >-
+      메인 OCPD 상류(서비스 도체)에 물리면 버스바 합산 판정을 피하는 대신 별도 조건이 붙는다.
+      이 도구는 포트 타입(ac_service_line vs 분기)으로 그 구분을 유지한다.
+    code_ref: "NEC 705.11 계열 — 원문 대조 필요"
+sources:
+  - ref: "사내 정리 — 회로 일반 성질 및 단선도 관례"
+    date: "2026-09"
+    note: "제품 스펙이 아니라 회로의 성질이다. 코드 조항은 전부 원문 대조 전(verified=false)"
+todos: []

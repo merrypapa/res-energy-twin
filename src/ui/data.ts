@@ -2,6 +2,8 @@ import raw from "./generated/data.json";
 import { Device } from "../schema/device.js";
 import { Topology } from "../schema/topology.js";
 import { Scenario } from "../schema/scenario.js";
+import { ConfigTemplate } from "../schema/template.js";
+import { NodeNote } from "../schema/note.js";
 import type { Finding } from "../schema/common.js";
 
 /**
@@ -11,15 +13,19 @@ import type { Finding } from "../schema/common.js";
 const bundle = raw as {
   built_at: string;
   devices: unknown[];
+  configurations: unknown[];
   topologies: unknown[];
   scenarios: unknown[];
+  notes: unknown[];
   data_findings: Finding[];
 };
 
 export const BUILT_AT = bundle.built_at;
 export const DEVICES = bundle.devices.map((d) => Device.parse(d));
+export const CONFIGURATIONS = bundle.configurations.map((c) => ConfigTemplate.parse(c));
 export const TOPOLOGIES = bundle.topologies.map((t) => Topology.parse(t));
 export const SCENARIOS = bundle.scenarios.map((s) => Scenario.parse(s));
+export const NOTES = bundle.notes.map((n) => NodeNote.parse(n));
 export const DATA_FINDINGS = bundle.data_findings;
 
-export const VENDORS = [...new Set(TOPOLOGIES.map((t) => t.vendor))].sort();
+export const VENDORS = [...new Set(CONFIGURATIONS.map((c) => c.vendor))].sort();

@@ -248,8 +248,17 @@ export function optionsSlug(tpl: ConfigTemplate, options: Options): string {
   return tpl.options.map((axis) => `${clean(axis.id)}-${clean(String(options[axis.id]))}`).join("-");
 }
 
-export function composeTopology(tpl: ConfigTemplate, given: Options = {}, preset?: Preset): ComposeResult {
+/** 옵션이 어떤 프리셋과 정확히 같은가. 같으면 프리셋의 id와 이름을 쓴다 — 링크가 안정된다. */
+function matchingPreset(tpl: ConfigTemplate, options: Options): Preset | undefined {
+  return tpl.presets.find((p) => {
+    const resolved = resolveOptions(tpl, p.options).options;
+    return tpl.options.every((axis) => String(resolved[axis.id]) === String(options[axis.id]));
+  });
+}
+
+export function composeTopology(tpl: ConfigTemplate, given: Options = {}, forcedPreset?: Preset): ComposeResult {
   const { options, findings } = resolveOptions(tpl, given);
+  const preset = forcedPreset ?? matchingPreset(tpl, options);
 
   const expanded = new Map<string, Expanded>();
   const nodes: Topology["nodes"] = [];

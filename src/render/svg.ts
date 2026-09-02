@@ -16,6 +16,8 @@ export interface RenderOptions {
   date?: string | null;
   /** 시나리오 이름(제목란 표기용). 급전 상태를 주입하면서 이 값을 빠뜨리면 도면이 거짓말을 한다. */
   scenario?: string | null;
+  /** 선택된 노드 ref. 표시는 선(파선 테두리)으로만 한다 — 색은 활선/사선 전용이다. */
+  selected?: string | null;
 }
 
 const DISCLAIMER =
@@ -54,6 +56,9 @@ function styles(): string {
   .conductor.dead { stroke: ${THEME.dead}; }
   .edge-label.dead { fill: ${THEME.dead}; }
   .rule { stroke: ${THEME.rule}; stroke-width: 0.8; }
+  .node { cursor: pointer; }
+  .node.selected .sym, .node.selected .sym-bus { stroke-width: 2.4; }
+  .select-box { fill: none; stroke: ${THEME.ink}; stroke-width: 1; stroke-dasharray: 4 3; }
   .halo { fill: ${THEME.bg}; stroke: none; }`;
 }
 
@@ -80,7 +85,13 @@ function renderEdge(r: RoutedEdge, state: "live" | "dead"): string {
   return `${line}${halo}${text}`;
 }
 
-function renderNode(g: RenderGraph, layout: Layout, ref: string, state: "live" | "dead"): string {
+function renderNode(
+  g: RenderGraph,
+  layout: Layout,
+  ref: string,
+  state: "live" | "dead",
+  selected: boolean,
+): string {
   const node = g.byRef.get(ref)!;
   const box = layout.nodes.find((n) => n.ref === ref)!;
   const cx = box.x + box.w / 2;
@@ -99,7 +110,14 @@ function renderNode(g: RenderGraph, layout: Layout, ref: string, state: "live" |
   // 노드에는 배경판을 깔지 않는다 — 카드처럼 보이지 않게(CLAUDE.md §6).
   // 배치가 도체를 노드 위로 지나가게 하지 않으므로 가릴 것도 없다.
   const parts: string[] = [];
-  parts.push(`<g class="node ${state}" data-ref="${esc(ref)}" data-class="${esc(node.device.class)}">`);
+  parts.push(
+    `<g class="node ${state}${selected ? " selected" : ""}" data-ref="${esc(ref)}" data-class="${esc(node.device.class)}">`,
+  );
+  if (selected) {
+    parts.push(
+      `<rect class="select-box" x="${round(box.x + 2)}" y="${round(box.y - 4)}" width="${round(box.w - 4)}" height="${round(box.h + 4)}"/>`,
+    );
+  }
   parts.push(`<g transform="translate(${round(cx)} ${round(glyphCy)})">${symbolFor(node.device.class)}</g>`);
 
   let baseline = textTop + 11;
@@ -205,13 +223,17 @@ export function renderTopology(topology: Topology, devices: Device[], opts: Rend
     body.push(renderEdge(r, edgeState(r.edge, energization)));
   }
   for (const n of graph.nodes) {
-    body.push(renderNode(graph, layout, n.ref, nodeState(graph, n.ref, energization)));
+    body.push(
+      renderNode(graph, layout, n.ref, nodeState(graph, n.ref, energization), opts.selected === n.ref),
+    );
   }
 
   const w = round(layout.width);
   const block = titleBlock(topology, layout.width, layout.height, opts, layers);
   const h = round(layout.height + block.height);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(topology.display_name)} 단선도">
+  // 자연 크기를 픽셀로 적는다. 화면에서 폭에 맞출지 실제 크기로 볼지는 CSS가 정한다 —
+  // 모듈 20장짜리 도면은 폭에 맞추면 라벨을 읽을 수 없어서 둘 다 필요하다.
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(topology.display_name)} 단선도">
   <title>${esc(topology.display_name)} — 단선도</title>
   <style>${styles()}</style>
   ${background(w, h)}

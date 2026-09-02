@@ -1,17 +1,23 @@
 import { describe, expect, it } from "vitest";
 import { parseHash, toHash, type UiState } from "../src/ui/urlState.js";
 import { EMPTY_SITE, SiteContext } from "../src/schema/rule.js";
-import { loadDevices, loadScenarios, loadPresetTopologies } from "../src/validate/index.js";
+import { loadConfigurations, loadDevices, loadNotes, loadScenarios, loadPresetTopologies } from "../src/validate/index.js";
+import { DEFAULT_OP, OperatingPoint } from "../src/analysis/operating-point.js";
+import { ConfigTemplate } from "../src/schema/template.js";
+import { NodeNote } from "../src/schema/note.js";
 import { Device } from "../src/schema/device.js";
 import { Topology } from "../src/schema/topology.js";
 import { Scenario } from "../src/schema/scenario.js";
 
 const base: UiState = {
-  selected: ["tesla-pw3-backup-switch-whole-home"],
+  selected: ["tesla-pw3"],
   layers: ["power", "comms"],
   scenarioId: null,
   trip: "",
   site: EMPTY_SITE,
+  options: {},
+  node: null,
+  op: DEFAULT_OP,
 };
 
 describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", () => {
@@ -27,8 +33,23 @@ describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", 
       scenarioId: "outage_islanded",
       trip: "pw3",
       site: SiteContext.parse({ utility: "PG&E", backup_load_kw: 14.5, largest_motor_lra: 200 }),
+      options: { backup_mode: "partial", pv_modules: 24, battery_units: 2 },
+      node: { topology: "tesla-pw3--x", ref: "mi-07" },
+      op: OperatingPoint.parse({ irradiance: 0.55, house_load_kw: 3.5 }),
     };
     expect(parseHash(toHash(state), base)).toEqual(state);
+  });
+
+  it("구성 옵션과 선택한 노드가 링크에 실린다 — 신호 화면을 그대로 공유할 수 있다", () => {
+    const h = toHash({
+      ...base,
+      options: { backup_mode: "whole_home", pv_modules: 20 },
+      node: { topology: "enphase-4g-meter-collar-whole-home", ref: "mi-10" },
+    });
+    expect(h).toContain("o=backup_mode%3Awhole_home%2Cpv_modules%3A20");
+    const back = parseHash(h, base);
+    expect(back.options["pv_modules"]).toBe(20);
+    expect(back.node).toEqual({ topology: "enphase-4g-meter-collar-whole-home", ref: "mi-10" });
   });
 
   it("앰퍼샌드가 든 유틸리티 이름이 깨지지 않는다", () => {
@@ -63,5 +84,7 @@ describe("UI 번들 계약", () => {
     for (const d of loadDevices("device-library").items) expect(() => Device.parse(d)).not.toThrow();
     for (const t of loadPresetTopologies("configurations").items) expect(() => Topology.parse(t)).not.toThrow();
     for (const s of loadScenarios("scenarios").items) expect(() => Scenario.parse(s)).not.toThrow();
+    for (const c of loadConfigurations("configurations").items) expect(() => ConfigTemplate.parse(c)).not.toThrow();
+    for (const n of loadNotes("node-notes").items) expect(() => NodeNote.parse(n)).not.toThrow();
   });
 });

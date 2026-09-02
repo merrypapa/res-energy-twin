@@ -3,8 +3,9 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 5 완료 — 전 스프린트 종료.**
-스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교 · 브라우저 앱 · Pages 배포.
+**현재 스프린트 6 완료.**
+스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교 · 브라우저 앱 · Pages 배포 ·
+구성 컴포저(옵션 축) · 배열 전개(모듈 1장 = 1노드) · 노드 신호(V·I·P + 수식) · 노드 노트.
 
 앱은 `npm run dev`. 렌더러 · 시나리오 · 룰 · 비교 엔진이 브라우저에서 그대로 돌고,
 UI 전용 로직은 없다. 상태는 URL 해시에 담기므로 링크를 그대로 공유할 수 있다.
@@ -12,7 +13,7 @@ UI 전용 로직은 없다. 상태는 URL 해시에 담기므로 링크를 그�
 ```bash
 npm install
 npm run validate    # 전 데이터 파일 검증 (error 있으면 exit 1)
-npm run render      # topologies/ → out/*.svg 단선도
+npm run render      # configurations/ 프리셋 → out/*.svg 단선도
 npm run render -- --scenario all   # 시나리오별 급전 상태를 반영한 도면
 npm run check       # 룰 엔진 — 코드 체크 Finding
 npm run compare     # 벤더별 구성 비교표 (최대 4종)
@@ -33,8 +34,11 @@ npm run typecheck
 | `src/schema/` | zod 스키마 — 데이터 형식의 단일 진실 원천 |
 | `src/schema/compat.ts` | 포트 타입 호환 표. 연결 가능 여부는 여기서만 판정 |
 | `src/validate/` | 로더 + 검증 규칙 (순수 함수) |
+| `src/config/` | 컴포저 — (템플릿, 옵션) → Topology. 순수 함수 |
+| `src/analysis/` | 전력 수지 · 노드 신호 · 노드 노트 해석. 순수 함수 |
 | `device-library/` | 제품 스펙 (YAML, 1제품 1파일) |
-| `topologies/` | 결선 그래프 (JSON, 1구성 1파일) |
+| `configurations/` | 구성 템플릿 (YAML, 1벤더 1파일) — 옵션 축 + 프리셋 |
+| `node-notes/` | 노드 포인트의 설계·기능 노트 (YAML) |
 | `scenarios/` | 운전 상태 정의 (JSON) |
 | `rules/` | 코드 체크 룰 (1룰 1파일, 순수 함수) |
 | `src/render/` | 그래프 → 계층 배치 → SVG (벤더 분기문 없음) |
@@ -70,7 +74,14 @@ npm run typecheck
 | E025 | `requires_one_of` 미충족 (예: 배터리는 있는데 MID 없음) |
 | W030 | 백업 구성인데 MID 제공 장치 없음 |
 | W031 | 백업 구성인데 MID 제공 여부가 미확인 |
+| W026 | 연결 수 한도 미확인(max_connections=null) 포트에 여러 도체 |
 | I010/I020/I021/I040 | 출처 날짜 누락, draft 사용, 미사용 device |
+| C010~C013 | 옵션 축 오류 (모르는 축, 없는 선택지, 범위 밖) |
+| C020~C025 | 템플릿 결선 오류 (조건에 없는 노드 참조, fanout 불일치) |
+| C040 | 성립하지 않는 옵션 조합 (정보 — 판정 결과이지 결함이 아니다) |
+| N010~N012 | 노드 노트 공백 · 출처 없음 |
+| P010~P021 | 전력 수지 — 정격 미확인, 부하 미지정, 아일랜드 공급 부족·제한 |
+| G010 | 신호 — 모듈 정격이 없어 DC 전압·전류를 계산할 수 없음 |
 
 `npm run check`(룰 엔진)는 별도 코드 체계를 쓴다. 데이터 정합성이 아니라
 "이 구성이 이 집에 성립하는가"를 답한다.
@@ -89,6 +100,34 @@ npm run typecheck
 ```json
 { "utility": "PG&E", "backup_load_kw": 14.5, "largest_motor_lra": 200, "service_a": 200 }
 ```
+
+## 구성 옵션 (스프린트 6)
+
+`configurations/*.yaml`이 옵션 축을 선언하고, 컴포저가 조합을 편다. UI의 선택지는
+이 데이터에서 그대로 나온다 — 축을 추가하는 데 코드 수정이 필요하면 설계가 잘못된 것이다.
+
+| 축 | 값 |
+|---|---|
+| `backup_mode` | `none`(grid support) · `partial` · `whole_home` — 값이 곧 backup_scope다 |
+| `mid_device` / `controller` | Backup Switch vs Gateway 3, MSC vs 게이트웨이 |
+| `battery_units` / `ess_units` / `inverter_units` | 확장·병렬 대수. 0이면 그 장치가 사라진다 |
+| `pv_modules` | 모듈 수. 마이크로인버터 수와 항상 같다 |
+| `string_size` / `branch_size` | 직렬 스트링 길이 / 분기회로당 유닛 수 |
+
+성립하지 않는 조합도 고를 수 있다. 예: Tesla `backup_mode=none`은 PW3의
+`requires_one_of`를 만족하지 못해 E025가 뜬다 — 그 판정을 보여주는 것이 이 도구의 목적이다.
+`npm run validate`는 모든 enum 조합을 펴서 컴포저 결함만 error로 잡고,
+성립하지 않는 조합은 `C040` 정보로 남긴다.
+
+## 노드 신호
+
+도면에서 노드를 클릭하면 그 지점의 전력·전압·전류와 파형, 그리고 계산 근거(수식)와
+설계 노트가 나온다. 숫자는 세 가지에서만 나온다 — 제품 정격, 포트 타입의 공칭 전압,
+전력 수지 결과. 하나라도 없으면 값은 `미확인`이고 이유가 함께 뜬다.
+
+- 입력은 일사(G/1000)와 주택 부하뿐이다. 효율·역률은 **가정값**이며 화면에 그렇게 적힌다
+- 전력 수지이지 부하조류 해석이 아니다 — 임피던스·전압 강하·무효전력을 풀지 않는다
+- 온도계수 미반영. 계산된 스트링 전압은 상온 STC 기준이며 스트링 설계 근거가 아니다
 
 ## 도면 규칙
 

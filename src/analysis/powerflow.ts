@@ -2,7 +2,7 @@ import type { Finding } from "../schema/common.js";
 import type { Scenario } from "../schema/scenario.js";
 import type { SiteContext } from "../schema/rule.js";
 import { edgeState, type EnergizationMap, type RenderGraph, type RGEdge, type RGNode } from "../graph/index.js";
-import { portElectrical } from "../schema/electrical.js";
+import { portElectrical, type Domain } from "../schema/electrical.js";
 import type { OperatingPoint } from "./operating-point.js";
 
 /**
@@ -17,6 +17,8 @@ import type { OperatingPoint } from "./operating-point.js";
 
 /** 엣지 id → 유효전력(kW). 양수면 edge.from → edge.to 방향. */
 export type EdgePower = Readonly<Record<string, number>>;
+
+type PortDomain = Domain;
 
 export interface PowerFlowResult {
   edges: EdgePower;
@@ -100,7 +102,13 @@ function pathTo(
   return out;
 }
 
-/** 경로를 따라가며 전력을 싣는다. 인버터를 지날 때마다 효율을 곱한다. */
+/**
+ * 경로를 따라가며 전력을 싣는다.
+ *
+ * 변환 손실은 **DC로 들어와 AC로 나가는 지점에서 한 번만** 먹인다.
+ * 마이크로인버터 트렁크처럼 인버터를 줄줄이 통과하는 경로에서 홉마다 효율을 곱하면
+ * η^n이 되어 하류로 갈수록 전력이 사라진다 — 트렁크는 변환이 아니라 통과다.
+ */
 function pushAlong(
   graph: RenderGraph,
   path: Array<{ edge: RGEdge; forward: boolean }>,
@@ -111,21 +119,19 @@ function pushAlong(
 ): number {
   let value = kw;
   let at = start;
+  // 시작 노드는 자기가 내는 도메인으로 나간다 (모듈은 DC, 축전지·계통은 AC).
+  let arrived: PortDomain = graph.byRef.get(start)?.device.class === "pv_module" ? "dc" : "ac";
   for (const step of path) {
-    const next = step.forward ? step.edge.to.nodeRef : step.edge.from.nodeRef;
-    // DC → AC로 넘어가는 지점에서만 변환 손실을 먹인다 (인버터를 두 번 세지 않는다).
     const nearType = step.forward ? step.edge.from.port.type : step.edge.to.port.type;
+    const farType = step.forward ? step.edge.to.port.type : step.edge.from.port.type;
+    const leaving = portElectrical(nearType).domain;
     const node = graph.byRef.get(at);
-    if (node && INVERTER_CLASSES.has(node.device.class) && portElectrical(nearType).domain === "ac") {
-      const incomingDc = graph.edges.some(
-        (e) =>
-          (e.to.nodeRef === at && portElectrical(e.to.port.type).domain === "dc") ||
-          (e.from.nodeRef === at && portElectrical(e.from.port.type).domain === "dc"),
-      );
-      if (incomingDc) value *= efficiency;
+    if (node && INVERTER_CLASSES.has(node.device.class) && arrived === "dc" && leaving === "ac") {
+      value *= efficiency;
     }
     acc[step.edge.id] = (acc[step.edge.id] ?? 0) + (step.forward ? value : -value);
-    at = next;
+    at = step.forward ? step.edge.to.nodeRef : step.edge.from.nodeRef;
+    arrived = portElectrical(farType).domain;
   }
   return value;
 }
