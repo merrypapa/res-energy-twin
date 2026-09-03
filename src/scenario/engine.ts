@@ -47,14 +47,17 @@ export interface EvaluateOptions {
 }
 
 /** 축전지를 품은 클래스 — 잔량 상태가 출력 가능 여부를 가른다. */
-const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery"]);
+const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery", "dc_battery"]);
 /** DC를 AC로 바꿔 계통에 내보내는 클래스. */
 const INVERTER_CLASSES = new Set([
   "microinverter",
+  "ac_module",
   "string_inverter",
   "hybrid_inverter_battery",
   "ac_battery",
 ]);
+/** PV를 품은 클래스 — 일사가 있어야 낸다. */
+export const PV_CLASSES: ReadonlySet<string> = new Set(["pv_module", "ac_module"]);
 
 type PortDomain = "ac" | "dc" | "other";
 type MidSide = "grid" | "load" | null;
@@ -65,8 +68,13 @@ function portDomain(type: string): PortDomain {
   return "other";
 }
 
-/** 이 장치가 지금 내보낼 에너지를 실제로 가지고 있는가. */
-function hasEnergy(node: RGNode, sc: Scenario): boolean {
+/**
+ * 이 장치가 지금 내보낼 에너지를 실제로 가지고 있는가.
+ *
+ * DC측 축전지는 스스로 AC를 내지 못한다 — 붙어 있는 인버터가 대신 낸다.
+ * 그래서 인버터의 에너지 보유 여부는 자기 PV뿐 아니라 연결된 DC 축전지도 본다.
+ */
+function hasEnergy(graph: RenderGraph, node: RGNode, sc: Scenario): boolean {
   const cls = node.device.class;
   if (BATTERY_CLASSES.has(cls)) {
     if (sc.battery === "offline") return false;
@@ -74,16 +82,32 @@ function hasEnergy(node: RGNode, sc: Scenario): boolean {
     // depleted — 하이브리드는 PV를 직접 변환해 낼 여지가 있다(성립 여부는 아래에서 따로 판정).
     return cls === "hybrid_inverter_battery" && sc.pv === "producing";
   }
-  if (cls === "microinverter" || cls === "string_inverter") return sc.pv === "producing";
+  if (cls === "microinverter" || cls === "ac_module" || cls === "string_inverter") {
+    if (sc.pv === "producing") return true;
+    return attachedDcBatteries(graph, node.ref).some((b) => sc.battery === "available");
+  }
   return false;
+}
+
+/** 이 노드에 DC로 물린 축전지들. */
+function attachedDcBatteries(graph: RenderGraph, ref: string): RGNode[] {
+  const out: RGNode[] = [];
+  for (const e of graph.edges) {
+    if (e.layer !== "power") continue;
+    const other = e.from.nodeRef === ref ? e.to.nodeRef : e.to.nodeRef === ref ? e.from.nodeRef : null;
+    if (other === null) continue;
+    const node = graph.byRef.get(other);
+    if (node && node.device.class === "dc_battery") out.push(node);
+  }
+  return out;
 }
 
 /**
  * 계통 기준 없이 스스로 전압을 세울 수 있는가.
  * grid_forming이 null(미확인)이면 false다 — 확인 전까지 성립을 주장하지 않는다.
  */
-function canFormIsland(node: RGNode, sc: Scenario): boolean {
-  if (!hasEnergy(node, sc)) return false;
+function canFormIsland(graph: RenderGraph, node: RGNode, sc: Scenario): boolean {
+  if (!hasEnergy(graph, node, sc)) return false;
   if (node.device.grid_forming !== true) return false;
   // 잔량이 없는 상태에서 세우려면 블랙스타트가 별도로 확인돼야 한다.
   if (sc.battery === "depleted") return node.device.black_start_capable === true;
@@ -99,7 +123,8 @@ function isInverter(node: RGNode): boolean {
  * 인버터는 AC를 낸다 — DC 포트로는 내보내지 않는다(어레이를 역급전하지 않는다).
  */
 function injectionDomain(node: RGNode): PortDomain {
-  return node.device.class === "pv_module" ? "dc" : "ac";
+  const cls = node.device.class;
+  return cls === "pv_module" || cls === "dc_battery" ? "dc" : "ac";
 }
 
 interface Traversal {
@@ -170,6 +195,14 @@ function propagate(
         // 노드를 관통하는 경우에만 도메인 규칙을 적용한다.
         if (cur.arrived.on === "ac" && nearDomain === "dc") continue;
         if (cur.arrived.on === "dc" && nearDomain === "ac" && !injecting.has(cur.ref)) continue;
+        // 변환기는 DC 버스바가 아니다. 축전지 DC가 인버터를 관통해 어레이로 되돌아가지 않는다.
+        if (
+          cur.arrived.on === "dc" &&
+          nearDomain === "dc" &&
+          INVERTER_CLASSES.has(graph.byRef.get(cur.ref)!.device.class)
+        ) {
+          continue;
+        }
       } else if (nearDomain !== injectionDomain(graph.byRef.get(cur.ref)!)) {
         // 시드는 자기가 내는 도메인으로만 나간다. 축전지가 야간에 DC측을 살리지 않는다.
         continue;
@@ -232,14 +265,18 @@ export function evaluateScenario(
   for (const n of graph.nodes) {
     if (tripped.has(n.ref)) continue; // 트립된 장치는 아무것도 내보내지 않는다
     if (n.device.class === "service_point" && scenario.grid === "present") seeds.push(n.ref);
+    // DC를 내는 소스만 여기서 시드가 된다. AC 모듈은 계통 추종 인버터라서
+    // 아일랜드에서 스스로 나설 수 없다 — 아래 인버터 판정을 그대로 따른다.
     if (n.device.class === "pv_module" && scenario.pv === "producing") seeds.push(n.ref);
+    // DC측 축전지는 인버터에 DC를 대준다. PV와 같은 자리다.
+    if (n.device.class === "dc_battery" && scenario.battery === "available") seeds.push(n.ref);
   }
 
   // AC를 내는 노드. 계통이 있으면 추종 운전이 가능하고, 없으면 누군가 먼저 세워야 한다.
   const injecting = new Set<string>();
   for (const n of graph.nodes) {
     if (!isInverter(n) || tripped.has(n.ref)) continue;
-    if (scenario.grid === "present" ? hasEnergy(n, scenario) : canFormIsland(n, scenario)) {
+    if (scenario.grid === "present" ? hasEnergy(graph, n, scenario) : canFormIsland(graph, n, scenario)) {
       injecting.add(n.ref);
       seeds.push(n.ref);
     }
@@ -250,7 +287,7 @@ export function evaluateScenario(
   for (let guard = 0; guard < graph.nodes.length + 1; guard++) {
     let changed = false;
     for (const n of graph.nodes) {
-      if (injecting.has(n.ref) || tripped.has(n.ref) || !isInverter(n) || !hasEnergy(n, scenario)) continue;
+      if (injecting.has(n.ref) || tripped.has(n.ref) || !isInverter(n) || !hasEnergy(graph, n, scenario)) continue;
       const acLive = graph.edges.some(
         (e) =>
           run.liveEdges.has(e.id) &&

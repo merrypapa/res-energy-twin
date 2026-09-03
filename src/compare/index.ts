@@ -144,6 +144,12 @@ function backupScope(t: Topology): string {
  * 제품명이 아니라 연결 구조에서 나온다.
  */
 function coupling(g: RenderGraph): string {
+  // AC 모듈은 변환기가 모듈 안에 있어 PV 결선 자체가 AC다 — 그래프에 DC 구간이 없다.
+  if (g.nodes.some((n) => n.device.class === "ac_module")) {
+    return g.nodes.some((n) => n.device.class === "pv_module")
+      ? "AC + DC 결합"
+      : "AC 결합 (AC 모듈)";
+  }
   const pvEdges = g.edges.filter(
     (e) =>
       e.layer === "power" &&
@@ -215,7 +221,7 @@ function lra(g: RenderGraph): string {
 }
 
 function isSource(n: RGNode): boolean {
-  return ["microinverter", "string_inverter", "hybrid_inverter_battery", "ac_battery"].includes(
+  return ["microinverter", "ac_module", "string_inverter", "hybrid_inverter_battery", "ac_battery"].includes(
     n.device.class,
   );
 }

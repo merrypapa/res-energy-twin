@@ -33,9 +33,16 @@ const only = onlyArg ? onlyArg.split(",").map((s) => s.trim()) : null;
  * 한 템플릿이 프리셋을 여러 개 갖게 된 뒤로 전부 넣으면 4분할 상한을 넘는다 —
  * 비교의 기본은 "같은 조건에서 벤더별"이지 "모든 프리셋"이 아니다.
  */
+const vendorPresetIds = new Set(
+  topologies.templates
+    .filter((t) => t.role === "vendor")
+    .flatMap((t) => t.presets.map((p) => p.id)),
+);
 const firstPerVendor = () => {
   const seen = new Set<string>();
-  return topologies.items.filter((t) => (seen.has(t.vendor) ? false : (seen.add(t.vendor), true)));
+  return topologies.items
+    .filter((t) => vendorPresetIds.has(t.id))
+    .filter((t) => (seen.has(t.vendor) ? false : (seen.add(t.vendor), true)));
 };
 let selected = only
   ? topologies.items.filter((t) => only.some((o) => t.id.startsWith(o)))

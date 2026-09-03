@@ -36,8 +36,16 @@ export interface PowerFlowResult {
   findings: Finding[];
 }
 
-const INVERTER_CLASSES = new Set(["microinverter", "string_inverter", "hybrid_inverter_battery", "ac_battery"]);
-const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery"]);
+const INVERTER_CLASSES = new Set([
+  "microinverter",
+  "ac_module",
+  "string_inverter",
+  "hybrid_inverter_battery",
+  "ac_battery",
+]);
+const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery", "dc_battery"]);
+/** 일사를 전력으로 바꾸는 클래스. AC 모듈은 변환기를 품고 있어 출력이 AC다. */
+const PV_CLASSES = new Set(["pv_module", "ac_module"]);
 
 function isLive(e: RGEdge, energization: EnergizationMap | null): boolean {
   return energization === null || edgeState(e, energization) === "live";
@@ -120,7 +128,9 @@ function pushAlong(
   let value = kw;
   let at = start;
   // 시작 노드는 자기가 내는 도메인으로 나간다 (모듈은 DC, 축전지·계통은 AC).
-  let arrived: PortDomain = graph.byRef.get(start)?.device.class === "pv_module" ? "dc" : "ac";
+  // AC 모듈도 시작은 DC다 — 변환이 함체 안에서 일어나므로 첫 홉에서 효율이 한 번 먹는다.
+  const startClass = graph.byRef.get(start)?.device.class ?? "";
+  let arrived: PortDomain = PV_CLASSES.has(startClass) || startClass === "dc_battery" ? "dc" : "ac";
   for (const step of path) {
     const nearType = step.forward ? step.edge.from.port.type : step.edge.to.port.type;
     const farType = step.forward ? step.edge.to.port.type : step.edge.from.port.type;
@@ -181,7 +191,7 @@ export function computePowerFlow(
   const pvPaths: Array<{ ref: string; kw: number; path: Array<{ edge: RGEdge; forward: boolean }> }> = [];
   const missingSpec = new Set<string>();
   for (const n of graph.nodes) {
-    if (n.device.class !== "pv_module") continue;
+    if (!PV_CLASSES.has(n.device.class)) continue;
     const stc = n.device.ratings.pv_stc_w;
     if (stc === null) {
       missingSpec.add(n.device.id);

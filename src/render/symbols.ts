@@ -40,6 +40,18 @@ const SYMBOLS: Record<DeviceClassName, string> = {
     <rect x="-20" y="-14" width="40" height="28" class="sym"/>
     <path class="sym" d="M -20 14 L 20 -14 M -6.7 -14 L -6.7 14 M 6.7 -14 L 6.7 14"/>`,
 
+  // AC 모듈: 모듈 사각형 + 우하단에 교류 표기. DC 구간이 밖으로 나오지 않는다는 뜻이다
+  ac_module: `
+    <rect x="-20" y="-14" width="40" height="28" class="sym"/>
+    <path class="sym" d="M -20 14 L 20 -14 M -6.7 -14 L -6.7 14"/>
+    <path class="sym" d="${sine(11, 7, 13)}"/>`,
+
+  // DC 축전지: 함체 안 축전지 + 직류 표기(=). 교류 인출이 없다 — 변환기가 없다
+  dc_battery: `
+    <rect x="-22" y="-15" width="44" height="30" rx="2" class="sym"/>
+    <path class="sym" d="${battery(-8, 0, 0.85)}"/>
+    <path class="sym" d="M 6 -3 L 16 -3 M 6 3 L 16 3"/>`,
+
   // 인버터: 사각형 대각 분할, 좌상 직류(=), 우하 교류(∿)
   microinverter: `
     <rect x="-19" y="-14" width="38" height="28" class="sym"/>
@@ -99,10 +111,12 @@ const FALLBACK = `<rect x="-20" y="-15" width="40" height="30" rx="2" class="sym
 const EXTENT: Record<DeviceClassName, readonly [number, number]> = {
   service_point: [15, 15],
   pv_module: [20, 14],
+  ac_module: [20, 14],
   microinverter: [19, 14],
   string_inverter: [19, 14],
   hybrid_inverter_battery: [22, 15],
   ac_battery: [22, 15],
+  dc_battery: [22, 15],
   mid: [22, 16],
   combiner: [22, 16],
   main_panel: [22, 16],
@@ -125,7 +139,7 @@ export function hasSymbol(cls: DeviceClassName): boolean {
  * 노드 상자 폭. 배열로 반복되는 소자(모듈·마이크로인버터)는 좁게 잡는다 —
  * 20장을 한 랭크에 늘어놓아야 단선도로 읽힌다. class로만 판정한다.
  */
-const NARROW: ReadonlySet<DeviceClassName> = new Set(["pv_module", "microinverter"]);
+const NARROW: ReadonlySet<DeviceClassName> = new Set(["pv_module", "ac_module", "microinverter"]);
 
 export function isNarrow(cls: DeviceClassName): boolean {
   return NARROW.has(cls);

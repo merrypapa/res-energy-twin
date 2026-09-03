@@ -266,11 +266,12 @@ export function composeTopology(tpl: ConfigTemplate, given: Options = {}, forced
     if (!matches(n.when, options)) continue;
     const ex = expandNode(n, options);
     expanded.set(n.ref, ex);
+    const deviceId = n.device_from !== null ? String(options[n.device_from] ?? n.device) : n.device;
     for (const m of ex.members) {
       const base = n.label ?? null;
       nodes.push({
         ref: m.ref,
-        device: n.device,
+        device: deviceId,
         label: ex.members.length > 1 && base ? `${base} ${pad(m.index, ex.members.length)}` : base,
         count: 1,
         group: m.group,
@@ -287,7 +288,8 @@ export function composeTopology(tpl: ConfigTemplate, given: Options = {}, forced
   const parsed = Topology.safeParse({
     id: preset ? preset.id : `${tpl.id}--${optionsSlug(tpl, options)}`,
     vendor: tpl.vendor,
-    display_name: preset ? preset.display_name : `${tpl.display_name} — ${describeOptions(tpl, options)}`,
+    // 옵션 요약은 왼쪽 패널이 이미 보여준다. 제목에 축을 다 붙이면 도면 제목란이 문단이 된다.
+    display_name: preset ? preset.display_name : tpl.display_name,
     status: tpl.status,
     backup_scope: scope,
     nodes,

@@ -49,9 +49,10 @@ const rule: Rule = {
         finding(rule, {
           severity: "info",
           code: "R030.1",
-          message: `연속 출력 정격이 없는 전원 ${unrated.length}건은 합산에서 빠졌다 (${unrated
-            .map((n) => n.device.id)
-            .join(", ")})`,
+          // 배열이 20노드로 펼쳐진 뒤로 같은 제품 id를 20번 나열하면 읽히지 않는다.
+          message: `연속 출력 정격이 없는 전원 ${unrated.length}건은 합산에서 빠졌다 (${[
+            ...new Set(unrated.map((n) => n.device.id)),
+          ].join(", ")})`,
           refs: unrated.map((n) => n.ref),
         }),
       );
