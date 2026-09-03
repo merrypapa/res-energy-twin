@@ -95,9 +95,12 @@ describe("하루 곡선", () => {
     expect(at(23)).toBe(0);
   });
 
-  it("정오 부근이 최댓값이다", () => {
+  it("정오의 값이 하루 최댓값이다", () => {
     const values = profile.ports["ac_out"]!;
-    const peakHour = profile.hours[values.indexOf(Math.max(...values))]!;
-    expect(Math.abs(peakHour - 12)).toBeLessThanOrEqual(1);
+    const peak = Math.max(...values);
+    const atNoon = values[profile.hours.findIndex((h) => Math.abs(h - 12) < 1e-9)]!;
+    // 최댓값 "지점"으로 보면 안 된다 — 클리핑이 걸리면 한낮이 평평해져서
+    // 첫 최댓값이 정오보다 이르게 나온다. 정오가 그 평탄부에 있는지를 본다.
+    expect(peak - atNoon).toBeLessThan(1e-6);
   });
 });

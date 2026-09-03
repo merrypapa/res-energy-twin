@@ -203,3 +203,53 @@ describe("노드 노트", () => {
     expect(checkNoteCoverage(notes, devices).filter((f) => f.severity === "error")).toEqual([]);
   });
 });
+
+describe("인버터 클리핑", () => {
+  const at = (id: string, irr: number) => {
+    const tpl = templates.find((t) => t.id === id)!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, devices, ["power", "comms"]);
+    return computePowerFlow(g, OperatingPoint.parse({ irradiance: irr, house_load_kw: 2 }), {});
+  };
+
+  it("DC/AC 비가 1을 넘는 구성은 STC에서 잘린다", () => {
+    // 모듈 400W · 마이크로인버터 0.325 kVA → 비 1.23
+    const f = at("enphase-4g", 1.0);
+    expect(f.clipped_kw).toBeGreaterThan(0);
+    expect(f.findings.some((x) => x.code === "P030")).toBe(true);
+  });
+
+  it("잘린 뒤 출력은 인버터 정격 합을 넘지 않는다", () => {
+    // 마이크로인버터 20대 × 0.325 kVA × 역률 1.0 = 6.5 kW
+    expect(at("enphase-4g", 1.0).pv_kw).toBeLessThanOrEqual(6.5 + 1e-6);
+  });
+
+  it("스트링 인버터도 합산 기준으로 잘린다", () => {
+    const f = at("solaredge-home-hub", 1.0);
+    expect(f.pv_kw).toBeLessThanOrEqual(7.6 + 1e-6);
+    expect(f.clipped_kw).toBeGreaterThan(0);
+  });
+
+  it("비가 1 이하면 잘리지 않는다", () => {
+    // 8 kWdc / 11.5 kWac = 0.70
+    const f = at("tesla-pw3", 1.0);
+    expect(f.clipped_kw).toBe(0);
+    expect(f.findings.some((x) => x.code === "P030")).toBe(false);
+  });
+
+  it("일사가 낮으면 잘리지 않는다 — 클리핑은 상단에서만 일어난다", () => {
+    expect(at("enphase-4g", 0.3).clipped_kw).toBe(0);
+    expect(at("enphase-4g", 1.0).clipped_kw).toBeGreaterThan(0);
+  });
+
+  it("같은 제품이 여러 대여도 finding은 하나로 모인다", () => {
+    const p030 = at("enphase-4g", 1.0).findings.filter((x) => x.code === "P030");
+    expect(p030.length).toBe(1);
+    expect(p030[0]!.message).toContain("20대");
+  });
+
+  it("AC 정격이 없으면 자르지 않고 그 사실을 경고한다", () => {
+    const f = at("qcells-qhome", 1.0);
+    expect(f.clipped_kw).toBe(0);
+    expect(f.findings.some((x) => x.code === "P031")).toBe(true);
+  });
+});

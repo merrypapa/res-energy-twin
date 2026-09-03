@@ -17,16 +17,25 @@ import { FindingList } from "./FindingList.js";
 import { DiffTable } from "./DiffTable.js";
 import { NodeInspector } from "./NodeInspector.js";
 import { ProductSheets } from "./ProductSheet.js";
-import { AskPanel } from "./AskPanel.js";
 import { buildBrief } from "../analysis/brief.js";
 import { specSheets } from "../analysis/spec.js";
 import { readState, writeState } from "./urlState.js";
 
 const ALL_LAYERS: Layer[] = ["power", "comms", "physical"];
 
-/** 처음 열었을 때는 벤더 구성을 보여준다. Customize(workbench)는 고르러 들어가는 곳이다. */
+/** 사내 기준 시스템. 처음 열면 이 구성이 뜬다. */
+const DEFAULT_TEMPLATE_ID = "qcells-qhome";
+
+/**
+ * 처음 열었을 때는 기준 구성을 보여준다. Customize(workbench)는 고르러 들어가는 곳이다.
+ * 기준 구성이 사라져도 빈 화면이 되지 않게 벤더 구성 → 첫 구성 순으로 떨어진다.
+ */
 function defaultTemplateId(): string {
-  return (CONFIGURATIONS.find((c) => c.role === "vendor") ?? CONFIGURATIONS[0])?.id ?? "";
+  return (
+    CONFIGURATIONS.find((c) => c.id === DEFAULT_TEMPLATE_ID) ??
+    CONFIGURATIONS.find((c) => c.role === "vendor") ??
+    CONFIGURATIONS[0]
+  )?.id ?? "";
 }
 const LAYER_LABEL: Record<Layer, string> = { power: "전력", comms: "통신", physical: "물리" };
 
@@ -42,7 +51,6 @@ export default function App() {
         options: {},
         node: null,
         op: DEFAULT_OP,
-        asking: false,
       }),
     [],
   );
@@ -59,7 +67,7 @@ export default function App() {
   );
   const [op, setOp] = useState<OperatingPoint>(initial.op);
   const [playing, setPlaying] = useState(false);
-  const [asking, setAsking] = useState(initial.asking);
+  const [copied, setCopied] = useState(false);
 
   const location = LOCATIONS.find((l) => l.id === op.location_id) ?? null;
   /** 엔진에 넘기는 동작점 — 위치가 있으면 일사가 (위도, 월, 시각)에서 계산된다. */
@@ -78,8 +86,8 @@ export default function App() {
 
   // 링크가 곧 저장이다. 백엔드가 없으므로 상태를 URL에 남긴다.
   useEffect(() => {
-    writeState({ selected, layers, scenarioId, trip, site, options, node, op, asking });
-  }, [selected, layers, scenarioId, trip, site, options, node, op, asking]);
+    writeState({ selected, layers, scenarioId, trip, site, options, node, op });
+  }, [selected, layers, scenarioId, trip, site, options, node, op]);
 
   const templates = useMemo(
     () => selected.map((id) => CONFIGURATIONS.find((c) => c.id === id)).filter((c) => c !== undefined),
@@ -319,13 +327,24 @@ export default function App() {
 
             <span className="label">단자(점)를 클릭하면 신호와 설계 노트가 나온다</span>
             <span className="spacer" />
+            {/*
+              화면 상태를 텍스트로 떠 간다. 여기서 답을 만들지 않는다 —
+              무엇을 계산했고 무엇이 아직 미확인인지를 그대로 넘길 뿐이다.
+            */}
             <button
               type="button"
               className="toggle"
-              data-on={asking}
-              onClick={() => setAsking((prev) => !prev)}
+              onClick={() => {
+                void navigator.clipboard?.writeText(brief).then(
+                  () => {
+                    setCopied(true);
+                    window.setTimeout(() => setCopied(false), 1500);
+                  },
+                  () => setCopied(false),
+                );
+              }}
             >
-              AI에게 묻기
+              {copied ? "복사됨" : "브리프 복사"}
             </button>
             <span className="label">도면</span>
             <div className="toggle-row">
@@ -390,9 +409,7 @@ export default function App() {
         </main>
 
         <aside className="pane right">
-          {asking ? (
-            <AskPanel brief={brief} onClose={() => setAsking(false)} />
-          ) : inspected ? (
+          {inspected ? (
             <NodeInspector
               graph={inspected.graph}
               report={inspected.report}

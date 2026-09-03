@@ -126,6 +126,7 @@ export function buildBrief(input: BriefInput): string {
         line("축전지", `${input.flow.battery_kw.toFixed(2)} kW (음수=충전)`),
         line("계통", `${input.flow.grid_kw.toFixed(2)} kW (음수=수출)`),
         line("부하", `${input.flow.load_kw.toFixed(2)} kW`),
+        input.flow.clipped_kw > 0 ? line("클리핑(인버터 AC 정격)", `${input.flow.clipped_kw.toFixed(2)} kW`) : "",
         input.flow.curtailed_kw > 0 ? line("제한(curtailment)", `${input.flow.curtailed_kw.toFixed(2)} kW`) : "",
       ]
     : [];

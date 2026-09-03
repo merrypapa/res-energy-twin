@@ -18,7 +18,6 @@ const base: UiState = {
   options: {},
   node: null,
   op: DEFAULT_OP,
-  asking: false,
 };
 
 describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", () => {
@@ -35,7 +34,6 @@ describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", 
       trip: "pw3",
       site: SiteContext.parse({ utility: "PG&E", backup_load_kw: 14.5, largest_motor_lra: 200 }),
       options: { backup_mode: "partial", pv_modules: 24, battery_units: 2 },
-      asking: true,
       node: { topology: "tesla-pw3--x", ref: "mi-07", port: "ac_out" },
       op: OperatingPoint.parse({
         location_id: "los-angeles-ca",

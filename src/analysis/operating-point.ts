@@ -2,6 +2,9 @@ import { z } from "zod";
 import type { Location } from "../schema/location.js";
 import { irradianceRatio, sunAt } from "./solar.js";
 
+/** 기준 지역. 지역을 지정하지 않은 화면은 여기에 있다고 본다. */
+export const DEFAULT_LOCATION_ID = "los-angeles-ca";
+
 /**
  * 동작점 — 신호 계산의 입력.
  *
@@ -19,8 +22,11 @@ export const OperatingPoint = z
      * location이 지정되면 이 값은 (위도, 월, 시각)에서 계산돼 덮어써진다 — withSolar() 참조.
      */
     irradiance: z.number().min(0).max(1.2).default(0.8),
-    /** 사이트 위치 id. null이면 일사를 직접 준다 */
-    location_id: z.string().nullable().default(null),
+    /**
+     * 사이트 위치 id. null이면 일사를 직접 준다.
+     * 기본값은 로스앤젤레스 — 지역을 고르지 않아도 일사가 (위도, 월, 시각)에서 나온다.
+     */
+    location_id: z.string().nullable().default(DEFAULT_LOCATION_ID),
     /** 월(1–12). 계절이 이 값으로 들어온다 */
     month: z.number().int().min(1).max(12).default(6),
     /** 현지 시각(0–24). 하루의 신호 변화가 이 축을 따라간다 */

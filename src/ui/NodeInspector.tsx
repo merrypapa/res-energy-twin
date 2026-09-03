@@ -142,6 +142,7 @@ export function NodeInspector({
           <li>
             수지: PV {flow.pv_kw.toFixed(2)} kW · 축전지 {flow.battery_kw.toFixed(2)} kW · 계통{" "}
             {flow.grid_kw.toFixed(2)} kW · 부하 {flow.load_kw.toFixed(2)} kW
+            {flow.clipped_kw > 0 && ` · 클리핑 ${flow.clipped_kw.toFixed(2)} kW`}
             {flow.curtailed_kw > 0 && ` · 제한 ${flow.curtailed_kw.toFixed(2)} kW`}
           </li>
         </ul>

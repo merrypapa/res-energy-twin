@@ -20,8 +20,6 @@ export interface UiState {
   /** 선택한 지점 — 어느 도면의 어느 노드의 어느 단자인지. port=null이면 함체 전체 */
   node: { topology: string; ref: string; port: string | null } | null;
   op: OperatingPoint;
-  /** AI 질문 패널이 열려 있는가. 링크로 그 화면을 그대로 열 수 있어야 한다 */
-  asking: boolean;
 }
 
 const LAYERS: Layer[] = ["power", "comms", "physical"];
@@ -86,7 +84,6 @@ export function parseHash(hash: string, fallback: UiState): UiState {
     options,
     node: nodeTopology && nodeRef ? { topology: nodeTopology, ref: nodeRef, port: nodePort } : null,
     op: op.success ? op.data : fallback.op,
-    asking: p.get("ask") === "1",
   };
 }
 
@@ -110,7 +107,6 @@ export function toHash(s: UiState): string {
   if (s.site.largest_motor_lra !== null) p.set("lra", String(s.site.largest_motor_lra));
   if (s.site.service_a !== null) p.set("service", String(s.site.service_a));
   if (s.site.utility) p.set("util", s.site.utility);
-  if (s.asking) p.set("ask", "1");
   return p.toString();
 }
 

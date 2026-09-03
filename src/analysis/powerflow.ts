@@ -31,8 +31,10 @@ export interface PowerFlowResult {
   battery_kw: number;
   /** 계통 순 수전(kW). 음수면 수출 */
   grid_kw: number;
-  /** 정격 한계로 버린 PV(kW) */
+  /** 아일랜드 수급 한계로 버린 PV(kW) */
   curtailed_kw: number;
+  /** 인버터 AC 정격에서 잘린 PV(kW). DC/AC 비가 1을 넘으면 여기서 손실이 난다 */
+  clipped_kw: number;
   findings: Finding[];
 }
 
@@ -50,8 +52,8 @@ function isLive(e: RGEdge, energization: EnergizationMap | null): boolean {
   return energization === null || edgeState(e, energization) === "live";
 }
 
-/** 축전지 연속 출력(kW). kVA만 있으면 역률 가정으로 환산한다. */
-function batteryRateKw(node: RGNode, pf: number): number | null {
+/** 변환기의 연속 AC 출력 한계(kW). kVA만 있으면 역률 가정으로 환산한다. */
+function acRateKw(node: RGNode, pf: number): number | null {
   const r = node.device.ratings;
   if (r.continuous_ac_kw !== null) return r.continuous_ac_kw;
   if (r.continuous_ac_kva !== null) return r.continuous_ac_kva * pf;
@@ -144,6 +146,30 @@ function pushAlong(
   return value;
 }
 
+/**
+ * 경로 위에서 DC를 AC로 바꾸는 첫 노드. pushAlong이 효율을 먹이는 바로 그 지점이다.
+ * 클리핑은 여기서 일어난다 — 그 뒤의 트렁크는 통과일 뿐 변환이 아니다.
+ */
+function conversionNode(
+  graph: RenderGraph,
+  path: Array<{ edge: RGEdge; forward: boolean }>,
+  start: string,
+): string | null {
+  let at = start;
+  const startClass = graph.byRef.get(start)?.device.class ?? "";
+  let arrived: PortDomain = PV_CLASSES.has(startClass) || startClass === "dc_battery" ? "dc" : "ac";
+  for (const step of path) {
+    const nearType = step.forward ? step.edge.from.port.type : step.edge.to.port.type;
+    const farType = step.forward ? step.edge.to.port.type : step.edge.from.port.type;
+    const leaving = portElectrical(nearType).domain;
+    const node = graph.byRef.get(at);
+    if (node && INVERTER_CLASSES.has(node.device.class) && arrived === "dc" && leaving === "ac") return at;
+    at = step.forward ? step.edge.to.nodeRef : step.edge.from.nodeRef;
+    arrived = portElectrical(farType).domain;
+  }
+  return null;
+}
+
 /** 부하가 걸리는 노드. 백업 경계 밖 패널이 죽으면 살아 있는 서브패널로 옮긴다. */
 function findLoadNode(graph: RenderGraph, energization: EnergizationMap | null): string | null {
   const live = (ref: string): boolean => {
@@ -186,7 +212,13 @@ export function computePowerFlow(
 
   // ── PV 발전 ────────────────────────────────────────────
   let pvAtLoad = 0;
-  const pvPaths: Array<{ ref: string; kw: number; path: Array<{ edge: RGEdge; forward: boolean }> }> = [];
+  const pvPaths: Array<{
+    ref: string;
+    kw: number;
+    path: Array<{ edge: RGEdge; forward: boolean }>;
+    /** 이 경로가 AC로 바뀌는 변환기 ref. 클리핑이 걸리는 지점이다 */
+    inverter?: string | null;
+  }> = [];
   const missingSpec = new Set<string>();
   for (const n of graph.nodes) {
     if (!PV_CLASSES.has(n.device.class)) continue;
@@ -216,7 +248,7 @@ export function computePowerFlow(
   let rate = 0;
   let rateKnown = batteries.length > 0;
   for (const b of batteries) {
-    const r = batteryRateKw(b, op.power_factor);
+    const r = acRateKw(b, op.power_factor);
     if (r === null) {
       rateKnown = false;
       findings.push({
@@ -229,8 +261,69 @@ export function computePowerFlow(
   }
   const cap = rateKnown ? rate : Number.POSITIVE_INFINITY;
 
-  // 총 PV(손실 반영 전) — 배분 비율 계산용
-  const pvRaw = pvPaths.reduce((s, p) => s + p.kw, 0);
+  // ── 인버터 클리핑 ──────────────────────────────────────
+  //
+  // 모듈의 DC 출력이 변환기의 AC 정격을 넘으면 상단이 잘린다. 어레이를 인버터보다
+  // 크게 잡는 것은 흔한 설계이므로(DC/AC 비 > 1) 맑은 한낮에는 정상적으로 잘린다.
+  // 자르지 않으면 신호가 실제보다 크게 나온다.
+  const dcByInverter = new Map<string, number>();
+  for (const p of pvPaths) {
+    p.inverter = conversionNode(graph, p.path, p.ref);
+    if (p.inverter === null) continue;
+    dcByInverter.set(p.inverter, (dcByInverter.get(p.inverter) ?? 0) + p.kw);
+  }
+
+  /** 변환기 ref → 통과 배율(1이면 클리핑 없음) */
+  const clipScale = new Map<string, number>();
+  let clipped = 0;
+  /** 같은 제품이 여러 대면 finding을 하나로 모은다 — 마이크로인버터 20대에 20줄을 쓰지 않는다 */
+  const clipByDevice = new Map<string, { units: number; dc: number; ac: number; lost: number }>();
+  const noRating = new Map<string, number>();
+
+  for (const [ref, dcKw] of dcByInverter) {
+    const node = graph.byRef.get(ref);
+    if (!node) continue;
+    const rate = acRateKw(node, op.power_factor);
+    if (rate === null) {
+      noRating.set(node.device.id, (noRating.get(node.device.id) ?? 0) + 1);
+      continue;
+    }
+    const potentialAc = dcKw * op.inverter_efficiency;
+    if (potentialAc <= rate + 1e-9) continue;
+    clipScale.set(ref, rate / potentialAc);
+    const lost = potentialAc - rate;
+    clipped += lost;
+    const acc = clipByDevice.get(node.device.id) ?? { units: 0, dc: 0, ac: rate, lost: 0 };
+    acc.units += 1;
+    acc.dc += dcKw;
+    acc.lost += lost;
+    clipByDevice.set(node.device.id, acc);
+  }
+
+  for (const [id, a] of clipByDevice) {
+    const perUnitDc = a.dc / a.units;
+    findings.push({
+      severity: "info",
+      code: "P030",
+      message:
+        `${id}${a.units > 1 ? ` ${a.units}대` : ""}: DC ${fmt(perUnitDc)} kW가 AC 정격 ${fmt(a.ac)} kW를 넘어 ` +
+        `클리핑됐다 (DC/AC 비 ${(perUnitDc / a.ac).toFixed(2)}). 합계 ${fmt(a.lost)} kW 손실`,
+      where: "powerflow",
+    });
+  }
+  for (const [id, units] of noRating) {
+    findings.push({
+      severity: "warning",
+      code: "P031",
+      message:
+        `${id}${units > 1 ? ` ${units}대` : ""}: 연속 AC 정격이 없어 클리핑 한계를 적용하지 못했다. ` +
+        `DC/AC 비가 1을 넘으면 신호가 실제보다 크다`,
+      where: "powerflow",
+    });
+  }
+
+  // 총 PV(손실 반영 전) — 배분 비율 계산용. 클리핑을 먼저 먹인다(하드웨어 한계가 먼저다).
+  const pvRaw = pvPaths.reduce((s, p) => s + p.kw * (p.inverter ? (clipScale.get(p.inverter) ?? 1) : 1), 0);
 
   // 실제로 실을 PV. 아일랜드에서는 부하 + 충전 여력을 넘는 발전을 실을 수 없다.
   let scale = 1;
@@ -253,7 +346,8 @@ export function computePowerFlow(
   }
 
   for (const p of pvPaths) {
-    pvAtLoad += pushAlong(graph, p.path, p.ref, p.kw * scale, op.inverter_efficiency, edges);
+    const clip = p.inverter ? (clipScale.get(p.inverter) ?? 1) : 1;
+    pvAtLoad += pushAlong(graph, p.path, p.ref, p.kw * clip * scale, op.inverter_efficiency, edges);
   }
 
   let batteryKw = 0;
@@ -319,6 +413,9 @@ export function computePowerFlow(
     battery_kw: batteryKw,
     grid_kw: gridKw,
     curtailed_kw: curtailed,
+    clipped_kw: clipped,
     findings,
   };
 }
+
+const fmt = (n: number): string => (Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2));
