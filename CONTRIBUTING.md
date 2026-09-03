@@ -95,6 +95,21 @@ presets:
 - 프리셋은 데이터 검증 error가 없어야 한다. 성립하지 않는 조합은 축에 남겨 두되
   프리셋으로 만들지 않는다 — 그 판정을 보여주는 것이 이 도구의 목적이다
 
+## 지역 추가
+
+`locations/<slug>.yaml` 하나를 만든다. 일사 계산에는 위도만 쓰인다 —
+기상 데이터(TMY)나 실측 일사량은 담지 않는다.
+
+```yaml
+id: denver-co
+display_name: 덴버, CO
+region: US Mountain
+latitude_deg: 39.74
+longitude_deg: -104.99
+utc_offset_hours: -7
+sources: [{ ref: "도시 대표 좌표 (근사)", date: "2026-09-03", note: "실제 사이트 좌표 아님" }]
+```
+
 ## 노드 노트 추가
 
 `node-notes/<slug>.yaml` 하나를 만든다. class 단위가 기본이고, 특정 제품에만 해당하면
@@ -121,7 +136,6 @@ sources:
 | class | 쓰임 |
 |---|---|
 | `pv_module` | PV 모듈 (DC 출력) |
-| `ac_module` | 변환기 일체형 모듈. DC 포트가 없다 |
 | `microinverter` / `string_inverter` | 계통 추종 인버터 |
 | `hybrid_inverter_battery` | 인버터 + 축전지 **일체** |
 | `ac_battery` | AC 결합 축전지 |

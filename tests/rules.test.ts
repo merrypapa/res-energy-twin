@@ -180,7 +180,7 @@ describe("R030 — 백업 부하 대비 연속 출력", () => {
 
   it("정격 없는 전원이 합산에서 빠진 사실을 숨기지 않는다", () => {
     // Qcells AC 모듈은 내장 마이크로인버터의 연속 출력이 아직 확인되지 않았다.
-    expect(find(run(qcells), "R030.1")?.message).toContain("qcells-qtron-blk-m-g2-ac");
+    expect(find(run(qcells), "R030.1")?.message).toContain("qcells-qtron-ac-microinverter");
   });
 
   it("count가 반영된다 — 유닛을 늘리면 합계가 커진다", () => {

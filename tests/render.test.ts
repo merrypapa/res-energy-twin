@@ -102,8 +102,11 @@ describe("SVG 출력", () => {
   it("노드와 엣지가 빠짐없이 그려진다", () => {
     for (const t of topologies) {
       const svg = renderTopology(t, devices);
-      expect(countOf(svg, /data-ref="/g)).toBe(t.nodes.length);
+      expect(countOf(svg, /<g class="node /g)).toBe(t.nodes.length);
       expect(countOf(svg, /data-edge="/g)).toBe(t.edges.length);
+      // 단자 점은 도체가 실제로 붙은 포트마다 하나씩 — 도체가 없는 포트에는 없다
+      const terminals = new Set(t.edges.flatMap((e) => [e.from, e.to]));
+      expect(countOf(svg, /<g class="port /g)).toBe(terminals.size);
       for (const n of t.nodes) expect(svg).toContain(`data-ref="${n.ref}"`);
     }
   });
@@ -212,6 +215,53 @@ describe("데이터가 제품이다 — 렌더러에 제품 지식이 없다", (
     });
     const svg = renderTopology(t, [...devices, newDevice]);
     expect(svg).toContain('data-class="hybrid_inverter_battery"');
-    expect(countOf(svg, /data-ref="/g)).toBe(3);
+    expect(countOf(svg, /<g class="node /g)).toBe(3);
+  });
+});
+
+describe("배열 블록 — 한 화면에 들어오게 접는다", () => {
+  const enphaseGraph = () => buildRenderGraph(byId("enphase-4g-meter-collar-whole-home"), devices);
+
+  it("모듈 20장이 한 줄로 늘어지지 않는다", () => {
+    const l = layoutGraph(enphaseGraph());
+    const pv = l.nodes.filter((n) => n.ref.startsWith("pv-"));
+    const rows = new Set(pv.map((n) => Math.round(n.y)));
+    expect(rows.size).toBeGreaterThan(1);
+    // 묶음(분기회로)이 행이 된다 — 20장 · 분기 10대 → 2행
+    expect(rows.size).toBe(2);
+    expect(l.width).toBeLessThan(1800);
+  });
+
+  it("모듈 바로 아래에 그 모듈의 인버터가 온다 — 1:1 대응이 눈에 보인다", () => {
+    const l = layoutGraph(enphaseGraph());
+    for (const i of ["01", "07", "20"]) {
+      const pv = l.nodes.find((n) => n.ref === `pv-${i}`)!;
+      const mi = l.nodes.find((n) => n.ref === `mi-${i}`)!;
+      expect(Math.abs(pv.x + pv.w / 2 - (mi.x + mi.w / 2))).toBeLessThan(1);
+      expect(mi.y).toBeGreaterThan(pv.y);
+    }
+  });
+
+  it("같은 분기의 유닛들은 같은 행에 있다", () => {
+    const l = layoutGraph(enphaseGraph());
+    const y = (ref: string) => l.nodes.find((n) => n.ref === ref)!.y;
+    expect(y("mi-01")).toBe(y("mi-10"));
+    expect(y("mi-11")).toBe(y("mi-20"));
+    expect(y("mi-11")).toBeGreaterThan(y("mi-10"));
+  });
+
+  it("단자 점은 도체가 붙은 포트마다 하나씩 나온다", () => {
+    const g = enphaseGraph();
+    const l = layoutGraph(g);
+    const terminals = new Set(
+      g.edges.flatMap((e) => [`${e.from.nodeRef}.${e.from.portId}`, `${e.to.nodeRef}.${e.to.portId}`]),
+    );
+    expect(l.ports.length).toBe(terminals.size);
+    for (const p of l.ports) expect(terminals.has(`${p.ref}.${p.portId}`)).toBe(true);
+  });
+
+  it("배치는 여전히 결정론적이다", () => {
+    const g = enphaseGraph();
+    expect(JSON.stringify(layoutGraph(g))).toBe(JSON.stringify(layoutGraph(enphaseGraph())));
   });
 });

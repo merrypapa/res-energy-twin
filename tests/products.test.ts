@@ -42,36 +42,48 @@ describe("제품 데이터 규율", () => {
   });
 });
 
-describe("AC 모듈 — 변환기 일체형", () => {
-  const acm = dev("qcells-qtron-blk-m-g2-ac");
-
-  it("DC 포트가 없다 — DC가 함체 밖으로 나오지 않는다", () => {
-    expect(acm.class).toBe("ac_module");
-    expect(acm.ports.every((p) => portElectrical(p.type).domain !== "dc")).toBe(true);
+describe("AC 모듈 — 모듈 + 변환기를 나눠 그린다", () => {
+  it("모듈 노드와 마이크로인버터 노드로 나뉜다 — 모듈의 DC 출력이 보여야 한다", () => {
+    const t = composeTopology(tpl("qcells-qhome")).topology;
+    expect(t.nodes.filter((n) => n.ref.startsWith("pv-"))).toHaveLength(20);
+    expect(t.nodes.filter((n) => n.ref.startsWith("mi-"))).toHaveLength(20);
+    expect(t.edges.map((e) => `${e.from}->${e.to}`)).toContain("pv-07.dc_out->mi-07.dc_in");
   });
 
-  it("도면에 DC 도체가 한 줄도 없다", () => {
+  it("모듈 DC 구간이 도면에 나온다", () => {
     const t = composeTopology(tpl("qcells-qhome")).topology;
     const g = buildRenderGraph(t, devices, ["power"]);
     const dc = g.edges.filter((e) =>
-      [e.from.port.type, e.to.port.type].some((ty) => portElectrical(ty).domain === "dc"),
+      [e.from.port.type, e.to.port.type].every((ty) => portElectrical(ty).domain === "dc"),
     );
-    expect(dc).toEqual([]);
+    expect(dc).toHaveLength(20);
   });
 
-  it("모듈들이 트렁크로 모여 결합반으로 간다 — 전류가 누적된다", () => {
-    const t = composeTopology(tpl("qcells-qhome")).topology;
+  it("변환기들이 트렁크로 모여 결합반으로 간다 — 전류가 누적된다", () => {
+    const t = composeTopology(tpl("qcells-qhome"), { pv_module_device: "generic-pv-module-400w" })
+      .topology;
     const g = buildRenderGraph(t, devices, ["power"]);
     const flow = computePowerFlow(g, OP, { scenario: scenarios.find((s) => s.id === "grid_normal")! });
     const at = (ref: string) => nodeSignals(g, ref, flow, OP).ports.find((p) => p.port_id === "ac_out")!.i!;
-    expect(at("acm-01")).toBeLessThan(at("acm-10"));
-    expect(at("acm-10") / at("acm-01")).toBeCloseTo(10, 1);
+    expect(at("mi-01")).toBeLessThan(at("mi-10"));
+    expect(at("mi-10") / at("mi-01")).toBeCloseTo(10, 1);
   });
 
   it("계통 추종이다 — 정전에서 스스로 아일랜드를 세우지 않는다", () => {
     const t = composeTopology(tpl("qcells-qhome"), { battery_units: 0 }).topology;
     const outage = evaluateScenario(t, devices, scenarios.find((s) => s.id === "outage_islanded")!);
     expect(outage.injectors).toEqual([]);
+  });
+
+  it("정격이 미확인인 모듈을 고르면 DC 전압·전류를 계산하지 않고 이유를 남긴다", () => {
+    const t = composeTopology(tpl("qcells-qhome")).topology; // 기본값 = Q.TRON (Vmp/Imp 미입력)
+    const g = buildRenderGraph(t, devices, ["power"]);
+    const flow = computePowerFlow(g, OP, { scenario: scenarios.find((s) => s.id === "grid_normal")! });
+    const dcOut = nodeSignals(g, "pv-01", flow, OP).ports.find((p) => p.port_id === "dc_out")!;
+    expect(dcOut.p_kw).toBeGreaterThan(0); // 출력(W)은 STC 정격에서 나온다
+    expect(dcOut.v).toBeNull();
+    expect(dcOut.i).toBeNull();
+    expect(dcOut.notes.join(" ")).toContain("pv_imp_a");
   });
 });
 
@@ -125,7 +137,7 @@ describe("제품 선택 (device_from)", () => {
       "enphase-4g": ["enphase-iq8m", "enphase-iq-battery-5p", "enphase-iq-meter-collar"],
       "tesla-pw3": ["tesla-powerwall-3", "tesla-backup-switch"],
       "solaredge-home-hub": ["solaredge-home-hub-se7600h", "solaredge-home-battery-400v", "solaredge-backup-interface"],
-      "qcells-qhome": ["qcells-qtron-blk-m-g2-ac", "qcells-qhome-core-g3", "qcells-qhome-hub-g3", "qcells-qhome-combiner-80-g1"],
+      "qcells-qhome": ["qcells-qtron-blk-m-g2", "qcells-qtron-ac-microinverter", "qcells-qhome-core-g3", "qcells-qhome-hub-g3", "qcells-qhome-combiner-80-g1"],
     };
     for (const [id, expected] of Object.entries(byVendor)) {
       const used = new Set(composeTopology(tpl(id)).topology.nodes.map((n) => n.device));

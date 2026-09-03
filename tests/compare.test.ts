@@ -67,7 +67,7 @@ describe("비교표", () => {
   });
 
   it("정격이 없는 전원이 합산에서 빠진 사실을 표시한다", () => {
-    // Qcells AC 모듈은 내장 마이크로인버터의 연속 출력이 미확인이라 합산에서 빠진다.
+    // Qcells 내장 마이크로인버터는 연속 출력이 미확인이라 합산에서 빠진다.
     expect(cell(cmp(pick("qcells")), "continuous", "Qcells")).toContain("미기재 20건 제외");
   });
 

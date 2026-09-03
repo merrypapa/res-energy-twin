@@ -3,10 +3,11 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 7 완료.**
+**현재 스프린트 8 완료.**
 스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교 · 브라우저 앱 · Pages 배포 ·
 구성 컴포저(옵션 축) · 배열 전개(모듈 1장 = 1노드) · 노드 신호(V·I·P + 수식) · 노드 노트 ·
-제조사 제품 라이브러리(데이터시트 링크 + 스펙 요약) · Customize 구성.
+제조사 제품 라이브러리(데이터시트 링크 + 스펙 요약) · Customize 구성 ·
+단자(포트) 선택 · 하루 시간축(지역·월·시각) · 배열 격자 배치.
 
 앱은 `npm run dev`. 렌더러 · 시나리오 · 룰 · 비교 엔진이 브라우저에서 그대로 돌고,
 UI 전용 로직은 없다. 상태는 URL 해시에 담기므로 링크를 그대로 공유할 수 있다.
@@ -40,6 +41,9 @@ npm run typecheck
 | `device-library/` | 제품 스펙 (YAML, 1제품 1파일) |
 | `configurations/` | 구성 템플릿 (YAML, 1벤더 1파일) — 옵션 축 + 프리셋 |
 | `node-notes/` | 노드 포인트의 설계·기능 노트 (YAML) |
+| `locations/` | 사이트 위치 (YAML) — 일사 계산의 위도·경도 |
+| `src/analysis/solar.ts` | 맑은 하늘 일사 근사 (위도·월·시각 → W/m²) |
+| `src/analysis/day.ts` | 하루 곡선 — 시각만 바꿔 조류를 다시 푼다 |
 | `src/analysis/spec.ts` | 제품 스펙 요약 (정격 표 → 화면 줄) |
 | `scenarios/` | 운전 상태 정의 (JSON) |
 | `rules/` | 코드 체크 룰 (1룰 1파일, 순수 함수) |
@@ -111,7 +115,7 @@ npm run typecheck
 | 축 | 값 |
 |---|---|
 | `backup_mode` | `none`(grid support) · `partial` · `whole_home` — 값이 곧 backup_scope다 |
-| `coupling` (Customize) | `ac_module` · `micro` · `dc_string` — 결합 방식이 결선 구조를 바꾼다 |
+| `coupling` (Customize) | `micro` · `dc_string` — 결합 방식이 결선 구조를 바꾼다 |
 | `*_device` | 그 자리의 제품 (`device_from`). 모듈 · 마이크로인버터 · 인버터 · ESS · MID · 결합반 |
 | `mid_device` / `controller` | Backup Switch vs Gateway 3, MSC vs 게이트웨이 |
 | `battery_units` / `ess_units` / `inverter_units` | 확장·병렬 대수. 0이면 그 장치가 사라진다 |
@@ -133,16 +137,27 @@ npm run typecheck
 | Enphase | IQ8M 마이크로인버터 · IQ Battery 5P · IQ Combiner 6C · IQ Meter Collar |
 | Tesla | Powerwall 3 · Backup Switch (또는 Gateway 3) |
 | SolarEdge | Home Hub SE7600H · Home Battery 400V(DC측) · Backup Interface |
-| Qcells | Q.TRON AC 모듈 · Q.HOME COMBINER 80 · Q.HOME HUB G3 · Q.HOME CORE G3 (**AC 결합**) |
+| Qcells | Q.TRON 모듈 + AC 내장 마이크로인버터 · Q.HOME COMBINER 80 · HUB G3 · CORE G3 (**AC 결합**) |
 
 제품 스펙은 제조사 공식 문서에서만 옮긴다. 확인하지 못한 값은 `null`로 두고 데이터시트
 링크를 남긴다 — 예를 들어 Q.TRON 모듈의 STC 전기 정격(Vmp/Imp/Voc/Isc)이 그렇고,
 그 모듈을 고르면 DC 전압·전류가 계산되지 않고 이유가 화면에 뜬다.
 
+## 시간축과 일사
+
+왼쪽에서 지역과 월을 고르면 일사가 위도·계절·시각에서 계산된다. 오른쪽 신호 패널 위의
+시간 슬라이더를 움직이면 그 시각의 값이 그대로 정지 화면이 되고, 재생을 누르면 24시간이 흐른다.
+
+- 모델: Cooper 적위 근사 + Meinel 직달 경험식, 경사 = 위도의 정남향 고정 경사
+- **구름·음영·온도·오염·서머타임 미반영.** 화면에 이 사실이 함께 뜬다
+- 시간 적분을 하지 않는다 — 매 시각이 독립적인 정상상태 한 점이고, 하루 곡선은 그 점들의 나열이다
+- 시나리오(활선/사선)와 시각(크기)은 다른 축이다. 야간이면 시나리오가 `producing`이어도
+  일사가 0이라 PV 출력이 0이 된다
+
 ## 노드 신호
 
-도면에서 노드를 클릭하면 그 지점의 전력·전압·전류와 파형, 그리고 계산 근거(수식)와
-설계 노트가 나온다. 숫자는 세 가지에서만 나온다 — 제품 정격, 포트 타입의 공칭 전압,
+도면에서 **단자(점)**를 클릭하면 그 지점의 전력·전압·전류와 파형, 하루 곡선, 계산 근거(수식)와
+설계 노트가 나온다. 함체를 클릭하면 그 제품의 모든 포트를 함께 본다. 숫자는 세 가지에서만 나온다 — 제품 정격, 포트 타입의 공칭 전압,
 전력 수지 결과. 하나라도 없으면 값은 `미확인`이고 이유가 함께 뜬다.
 
 - 입력은 일사(G/1000)와 주택 부하뿐이다. 효율·역률은 **가정값**이며 화면에 그렇게 적힌다
