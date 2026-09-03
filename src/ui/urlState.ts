@@ -17,8 +17,8 @@ export interface UiState {
   site: SiteContext;
   /** 옵션 축 값. 축 id는 템플릿마다 공유된다 (같은 조건으로 벤더 비교) */
   options: Options;
-  /** 선택한 노드 — 어느 도면의 어느 노드인지 */
-  node: { topology: string; ref: string } | null;
+  /** 선택한 지점 — 어느 도면의 어느 노드의 어느 단자인지. port=null이면 함체 전체 */
+  node: { topology: string; ref: string; port: string | null } | null;
   op: OperatingPoint;
 }
 
@@ -55,10 +55,23 @@ export function parseHash(hash: string, fallback: UiState): UiState {
   }
 
   const nodeRaw = p.get("n");
-  const [nodeTopology, nodeRef] = (nodeRaw ?? "").split("/");
+  const [nodeTopology, nodeTail] = (nodeRaw ?? "").split("/");
+  const dot = nodeTail?.indexOf(".") ?? -1;
+  const nodeRef = nodeTail === undefined ? undefined : dot < 0 ? nodeTail : nodeTail.slice(0, dot);
+  const nodePort = nodeTail !== undefined && dot >= 0 ? nodeTail.slice(dot + 1) : null;
 
+  const numRaw = (key: string): number | undefined => {
+    const raw = p.get(key);
+    if (raw === null || raw.trim() === "") return undefined;
+    const v = Number(raw);
+    return Number.isFinite(v) ? v : undefined;
+  };
   const op = OperatingPoint.safeParse({
-    irradiance: p.get("irr") !== null ? Number(p.get("irr")) : undefined,
+    irradiance: numRaw("irr"),
+    location_id: p.get("loc") || null,
+    month: numRaw("mon"),
+    hour: numRaw("hr"),
+    clearness: numRaw("clr"),
     house_load_kw: num("hload"),
   });
 
@@ -69,7 +82,7 @@ export function parseHash(hash: string, fallback: UiState): UiState {
     trip: p.get("trip") ?? "",
     site: site.success ? site.data : EMPTY_SITE,
     options,
-    node: nodeTopology && nodeRef ? { topology: nodeTopology, ref: nodeRef } : null,
+    node: nodeTopology && nodeRef ? { topology: nodeTopology, ref: nodeRef, port: nodePort } : null,
     op: op.success ? op.data : fallback.op,
   };
 }
@@ -83,8 +96,12 @@ export function toHash(s: UiState): string {
   if (s.trip) p.set("trip", s.trip);
   const opts = Object.entries(s.options).map(([k, v]) => `${k}:${String(v)}`);
   if (opts.length > 0) p.set("o", opts.join(","));
-  if (s.node) p.set("n", `${s.node.topology}/${s.node.ref}`);
-  p.set("irr", String(s.op.irradiance));
+  if (s.node) p.set("n", `${s.node.topology}/${s.node.ref}${s.node.port ? `.${s.node.port}` : ""}`);
+  if (s.op.location_id) p.set("loc", s.op.location_id);
+  p.set("mon", String(s.op.month));
+  p.set("hr", String(s.op.hour));
+  if (s.op.clearness < 1) p.set("clr", String(s.op.clearness));
+  if (s.op.location_id === null) p.set("irr", String(s.op.irradiance));
   if (s.op.house_load_kw !== null) p.set("hload", String(s.op.house_load_kw));
   if (s.site.backup_load_kw !== null) p.set("load", String(s.site.backup_load_kw));
   if (s.site.largest_motor_lra !== null) p.set("lra", String(s.site.largest_motor_lra));

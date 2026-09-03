@@ -6,8 +6,11 @@ import type { OperatingPoint } from "../analysis/operating-point.js";
 import { assumptionLines } from "../analysis/operating-point.js";
 import { notesFor } from "../analysis/notes.js";
 import { ELECTRICAL_SOURCE } from "../schema/electrical.js";
-import { IvChart, WaveformChart } from "./SignalChart.js";
+import type { Location } from "../schema/location.js";
+import type { DayProfile } from "../analysis/day.js";
+import { IvChart, LinePlot, WaveformChart } from "./SignalChart.js";
 import { ProductCard } from "./ProductSheet.js";
+import { TimeBar } from "./TimeBar.js";
 
 /**
  * 노드 포인트 패널 — 위는 그래프, 아래는 설명.
@@ -21,21 +24,40 @@ export function NodeInspector({
   report,
   flow,
   op,
+  rawOp,
+  location,
+  day,
+  focusPort,
   notes,
+  playing,
+  onHour,
+  onPlay,
   onClose,
 }: {
   graph: RenderGraph;
   report: NodeSignalReport;
   flow: PowerFlowResult;
+  /** 일사가 계산돼 들어간 동작점 (엔진이 쓴 것) */
   op: OperatingPoint;
+  /** 사용자가 고른 값 그대로 — 시간 축이 이걸 움직인다 */
+  rawOp: OperatingPoint;
+  location: Location | null;
+  day: DayProfile | null;
+  focusPort: string | null;
   notes: NodeNote[];
+  playing: boolean;
+  onHour: (hour: number) => void;
+  onPlay: (playing: boolean) => void;
   onClose: () => void;
 }) {
   const node = graph.byRef.get(report.ref)!;
   const applicable = notesFor(notes, node.device);
   const power = report.ports.filter((p) => p.domain !== "signal");
   const signal = report.ports.filter((p) => p.domain === "signal");
-  const charted = power.filter((p) => p.waveform !== null && Math.abs(p.p_kw ?? 0) > 0.0005);
+  // 단자를 골랐으면 그 단자만 그린다. 함체를 골랐으면 전력 포트 전부.
+  const focused = focusPort === null ? power : power.filter((p) => p.port_id === focusPort);
+  const charted = focused.filter((p) => p.waveform !== null && Math.abs(p.p_kw ?? 0) > 0.0005);
+  const ordered = focusPort === null ? power : [...focused, ...power.filter((p) => p.port_id !== focusPort)];
 
   return (
     <section className="inspector">
@@ -43,7 +65,12 @@ export function NodeInspector({
         <div>
           <h2>{report.label}</h2>
           <p className="sub">
-            {node.device.display_name} · {report.device_class} · <span className="mono">{report.ref}</span>
+            {node.device.display_name} · {report.device_class} ·{" "}
+            <span className="mono">
+              {report.ref}
+              {focusPort !== null && `.${focusPort}`}
+            </span>
+            {focusPort !== null && " 단자"}
           </p>
         </div>
         <button type="button" className="toggle" onClick={onClose}>
@@ -51,9 +78,34 @@ export function NodeInspector({
         </button>
       </header>
 
+      {/* ── 시간 축: 하루가 흐르면 신호가 어떻게 변하는가 ───────── */}
+      <TimeBar op={rawOp} location={location} playing={playing} onHour={onHour} onPlay={onPlay} />
+
       {/* ── 그래프: 이 노드에서 무엇이 흐르는가 ───────────────── */}
       <div className="group charts">
         <h3>신호</h3>
+        {day && (
+          <div className="port-charts">
+            <p className="chart-caption">하루 전력 — 시간 축의 눈금이 지금 보고 있는 시각이다</p>
+            {(focusPort === null ? power : focused).map((p) => (
+              <LinePlot
+                key={`day-${p.port_id}`}
+                x={day.hours}
+                y={day.ports[p.port_id] ?? []}
+                title={`${p.port_id} · P(t)`}
+                unit="kW"
+                marker={{
+                  x: rawOp.hour,
+                  y: (day.ports[p.port_id] ?? [])[Math.round(rawOp.hour / day.step)] ?? 0,
+                  label: `${(
+                    (day.ports[p.port_id] ?? [])[Math.round(rawOp.hour / day.step)] ?? 0
+                  ).toFixed(2)} kW`,
+                }}
+                xLabels={["00시", "24시"]}
+              />
+            ))}
+          </div>
+        )}
         {charted.length === 0 && report.iv === null && (
           <p className="empty">
             이 노드에는 지금 흐르는 전력이 없거나, 계산에 필요한 정격이 확인되지 않았다.
@@ -84,7 +136,7 @@ export function NodeInspector({
       <div className="group">
         <h3>동작점</h3>
         <ul className="plain">
-          {assumptionLines(op).map((line) => (
+          {assumptionLines(op, location).map((line) => (
             <li key={line}>{line}</li>
           ))}
           <li>
@@ -95,8 +147,8 @@ export function NodeInspector({
         </ul>
       </div>
 
-      {power.map((p) => (
-        <PortPanel key={p.port_id} port={p} />
+      {ordered.map((p) => (
+        <PortPanel key={p.port_id} port={p} focused={focusPort === p.port_id} />
       ))}
 
       {signal.length > 0 && (
@@ -159,10 +211,10 @@ function num(v: number | null, unit: string, digits = 2): string {
   return v === null ? "미확인" : `${Number(v.toFixed(digits))} ${unit}`;
 }
 
-function PortPanel({ port }: { port: PortSignal }) {
+function PortPanel({ port, focused }: { port: PortSignal; focused: boolean }) {
   const flowing = port.p_kw !== null && Math.abs(port.p_kw) > 0.0005;
   return (
-    <div className="group port">
+    <div className="group port" data-focused={focused}>
       <h3>
         <span className="mono">{port.port_id}</span> · {port.domain === "ac" ? "교류" : "직류"}
         <span className="sub"> {port.arrangement}</span>

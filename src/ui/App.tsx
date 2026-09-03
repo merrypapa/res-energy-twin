@@ -9,8 +9,9 @@ import { compareTopologies } from "../compare/index.js";
 import { composeTopology, type Options } from "../config/compose.js";
 import { computePowerFlow } from "../analysis/powerflow.js";
 import { nodeSignals } from "../analysis/signals.js";
-import { DEFAULT_OP, OperatingPoint } from "../analysis/operating-point.js";
-import { BUILT_AT, CONFIGURATIONS, DATA_FINDINGS, DEVICES, NOTES, SCENARIOS } from "./data.js";
+import { dayProfile } from "../analysis/day.js";
+import { DEFAULT_OP, OperatingPoint, withSolar } from "../analysis/operating-point.js";
+import { BUILT_AT, CONFIGURATIONS, DATA_FINDINGS, DEVICES, LOCATIONS, NOTES, SCENARIOS } from "./data.js";
 import { Configurator } from "./Configurator.js";
 import { FindingList } from "./FindingList.js";
 import { DiffTable } from "./DiffTable.js";
@@ -50,8 +51,24 @@ export default function App() {
   const [trip, setTrip] = useState<string>(initial.trip);
   const [site, setSite] = useState<SiteContext>(initial.site);
   const [options, setOptions] = useState<Options>(initial.options);
-  const [node, setNode] = useState<{ topology: string; ref: string } | null>(initial.node);
+  const [node, setNode] = useState<{ topology: string; ref: string; port: string | null } | null>(
+    initial.node,
+  );
   const [op, setOp] = useState<OperatingPoint>(initial.op);
+  const [playing, setPlaying] = useState(false);
+
+  const location = LOCATIONS.find((l) => l.id === op.location_id) ?? null;
+  /** 엔진에 넘기는 동작점 — 위치가 있으면 일사가 (위도, 월, 시각)에서 계산된다. */
+  const solarOp = useMemo(() => withSolar(op, location), [op, location]);
+
+  // 재생: 시각만 흐른다. 결선도 시나리오도 그대로이므로 도면은 다시 그리지 않는다.
+  useEffect(() => {
+    if (!playing || location === null) return;
+    const timer = setInterval(() => {
+      setOp((prev) => OperatingPoint.parse({ ...prev, hour: prev.hour >= 24 ? 0 : prev.hour + 0.25 }));
+    }, 110);
+    return () => clearInterval(timer);
+  }, [playing, location]);
   /** 도면 크기. 모듈 20장짜리 도면은 폭에 맞추면 읽을 수 없다 — 기본은 실제 크기다. */
   const [zoom, setZoom] = useState<"actual" | "fit">("actual");
 
@@ -67,7 +84,11 @@ export default function App() {
   const scenario = SCENARIOS.find((s) => s.id === scenarioId);
   const comparing = templates.length > 1;
 
-  const results = useMemo(
+  /**
+   * 결선·도면은 동작점과 무관하다. 시각이 흐를 때 도면을 다시 그리지 않도록
+   * 구조 계산과 조류 계산을 나눈다 — 재생이 부드러워야 하루의 변화가 읽힌다.
+   */
+  const structures = useMemo(
     () =>
       templates.map((tpl) => {
         // 이 템플릿이 아는 축만 넘긴다. 벤더마다 축이 달라도 값은 공유된다.
@@ -85,21 +106,16 @@ export default function App() {
           const open = trip ? [trip] : [];
           const run = scenario ? evaluateScenario(topology, DEVICES, scenario, { open }) : null;
           const graph = buildRenderGraph(topology, DEVICES, ALL_LAYERS);
-          const flow = computePowerFlow(graph, op, {
-            scenario: scenario ?? null,
-            energization: run?.energization ?? null,
-            site,
-          });
           return {
             ...base,
             error: null as string | null,
             run,
             graph,
-            flow,
             svg: renderTopology(topology, DEVICES, {
               layers,
               date: BUILT_AT,
               selected: node?.topology === topology.id ? node.ref : null,
+              selectedPort: node?.topology === topology.id ? node.port : null,
               ...(run && scenario ? { energization: run.energization, scenario: scenario.id } : {}),
             }),
             rules: runRules(topology, DEVICES, site),
@@ -115,13 +131,28 @@ export default function App() {
             error: e instanceof Error ? e.message : String(e),
             run: null,
             graph: null,
-            flow: null,
             svg: "",
             rules: { topology_id: topology.id, findings: [], unverified: [] },
           };
         }
       }),
-    [templates, options, scenario, layers, site, trip, node, op],
+    [templates, options, scenario, layers, site, trip, node],
+  );
+
+  const results = useMemo(
+    () =>
+      structures.map((st) => ({
+        ...st,
+        flow:
+          st.graph === null
+            ? null
+            : computePowerFlow(st.graph, solarOp, {
+                scenario: scenario ?? null,
+                energization: st.run?.energization ?? null,
+                site,
+              }),
+      })),
+    [structures, solarOp, scenario, site],
   );
 
   const comparison = useMemo(
@@ -144,9 +175,20 @@ export default function App() {
     return {
       graph: target.graph,
       flow: target.flow,
-      report: nodeSignals(target.graph, node.ref, target.flow, op),
+      report: nodeSignals(target.graph, node.ref, target.flow, solarOp),
+      /** 하루 곡선: 시각만 바꿔 조류를 다시 풀어 이 노드의 포트별 전력을 모은다. */
+      day:
+        location === null
+          ? null
+          : dayProfile(target.graph, node.ref, {
+              op,
+              location,
+              scenario: scenario ?? null,
+              energization: target.run?.energization ?? null,
+              site,
+            }),
     };
-  }, [node, results, op]);
+  }, [node, results, solarOp, op, location, scenario, site]);
 
   /** 지금 구성에 실제로 들어간 제품들 — 스펙과 데이터시트를 오른쪽에 띄운다. */
   const products = useMemo(
@@ -163,7 +205,13 @@ export default function App() {
     const ref = el.getAttribute("data-ref");
     const topology = sheet.getAttribute("data-topology");
     if (!ref || !topology) return;
-    setNode((prev) => (prev?.ref === ref && prev.topology === topology ? null : { topology, ref }));
+    // 단자를 누르면 그 단자, 함체를 누르면 노드 전체.
+    const port = el.getAttribute("data-port");
+    setNode((prev) =>
+      prev?.ref === ref && prev.topology === topology && prev.port === port
+        ? null
+        : { topology, ref, port },
+    );
   };
 
   const tripTargets = results.length === 1 ? (results[0]?.topology.nodes ?? []) : [];
@@ -191,6 +239,7 @@ export default function App() {
             onSite={setSite}
             op={op}
             onOp={setOp}
+            locations={LOCATIONS}
           />
         </aside>
 
@@ -310,8 +359,15 @@ export default function App() {
               graph={inspected.graph}
               report={inspected.report}
               flow={inspected.flow}
-              op={op}
+              op={solarOp}
+              rawOp={op}
+              location={location}
+              day={inspected.day}
+              focusPort={node?.port ?? null}
               notes={NOTES}
+              playing={playing}
+              onHour={(hour) => setOp((prev) => OperatingPoint.parse({ ...prev, hour }))}
+              onPlay={setPlaying}
               onClose={() => setNode(null)}
             />
           ) : (

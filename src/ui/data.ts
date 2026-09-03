@@ -4,6 +4,7 @@ import { Topology } from "../schema/topology.js";
 import { Scenario } from "../schema/scenario.js";
 import { ConfigTemplate } from "../schema/template.js";
 import { NodeNote } from "../schema/note.js";
+import { Location } from "../schema/location.js";
 import type { Finding } from "../schema/common.js";
 
 /**
@@ -17,6 +18,7 @@ const bundle = raw as {
   topologies: unknown[];
   scenarios: unknown[];
   notes: unknown[];
+  locations: unknown[];
   data_findings: Finding[];
 };
 
@@ -26,6 +28,7 @@ export const CONFIGURATIONS = bundle.configurations.map((c) => ConfigTemplate.pa
 export const TOPOLOGIES = bundle.topologies.map((t) => Topology.parse(t));
 export const SCENARIOS = bundle.scenarios.map((s) => Scenario.parse(s));
 export const NOTES = bundle.notes.map((n) => NodeNote.parse(n));
+export const LOCATIONS = bundle.locations.map((l) => Location.parse(l));
 export const DATA_FINDINGS = bundle.data_findings;
 
 export const VENDORS = [...new Set(CONFIGURATIONS.map((c) => c.vendor))].sort();

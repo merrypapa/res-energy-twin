@@ -1,4 +1,5 @@
 import type { ConfigTemplate, OptionAxis } from "../schema/template.js";
+import type { Location } from "../schema/location.js";
 import { SiteContext } from "../schema/rule.js";
 import { OperatingPoint } from "../analysis/operating-point.js";
 import type { Options } from "../config/compose.js";
@@ -11,6 +12,7 @@ import type { Options } from "../config/compose.js";
  * "같은 조건에서 벤더별 구성"이 비교된다.
  */
 const MAX_COMPARE = 4;
+const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export function Configurator({
   templates,
@@ -22,6 +24,7 @@ export function Configurator({
   onSite,
   op,
   onOp,
+  locations,
 }: {
   templates: ConfigTemplate[];
   selected: string[];
@@ -32,6 +35,7 @@ export function Configurator({
   onSite: (s: SiteContext) => void;
   op: OperatingPoint;
   onOp: (o: OperatingPoint) => void;
+  locations: Location[];
 }) {
   const chosen = templates.filter((t) => selected.includes(t.id));
 
@@ -159,17 +163,67 @@ export function Configurator({
 
       <h2>동작점 (신호 계산 입력)</h2>
       <div className="group">
-        <label className="field">
-          <span>일사 G/1000 — {Math.round(op.irradiance * 100)}%</span>
-          <input
-            type="range"
-            min="0"
-            max="1.2"
-            step="0.05"
-            value={op.irradiance}
-            onChange={(e) => onOp(OperatingPoint.parse({ ...op, irradiance: Number(e.target.value) }))}
-          />
-        </label>
+        <div className="axis">
+          <span className="axis-label">지역</span>
+          <select
+            className="axis-select"
+            value={op.location_id ?? ""}
+            onChange={(e) =>
+              onOp(OperatingPoint.parse({ ...op, location_id: e.target.value || null }))
+            }
+          >
+            <option value="">직접 지정 (일사를 손으로 준다)</option>
+            {locations.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.display_name} · 위도 {l.latitude_deg}°
+              </option>
+            ))}
+          </select>
+          <p className="hint">위도가 태양 고도를 정하고, 그것이 일사를 정한다.</p>
+        </div>
+
+        <div className="axis">
+          <span className="axis-label">월 (계절)</span>
+          <select
+            className="axis-select"
+            value={op.month}
+            onChange={(e) => onOp(OperatingPoint.parse({ ...op, month: Number(e.target.value) }))}
+            disabled={op.location_id === null}
+          >
+            {MONTHS.map((m) => (
+              <option key={m} value={m}>
+                {m}월
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {op.location_id === null ? (
+          <label className="field">
+            <span>일사 G/1000 — {Math.round(op.irradiance * 100)}%</span>
+            <input
+              type="range"
+              min="0"
+              max="1.2"
+              step="0.05"
+              value={op.irradiance}
+              onChange={(e) => onOp(OperatingPoint.parse({ ...op, irradiance: Number(e.target.value) }))}
+            />
+          </label>
+        ) : (
+          <label className="field">
+            <span>맑음 대비 — {Math.round(op.clearness * 100)}%</span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={op.clearness}
+              onChange={(e) => onOp(OperatingPoint.parse({ ...op, clearness: Number(e.target.value) }))}
+            />
+          </label>
+        )}
+
         <label className="field">
           <span>주택 부하 (kW)</span>
           <input
@@ -188,7 +242,7 @@ export function Configurator({
         </label>
         <p className="hint">
           효율 {(op.inverter_efficiency * 100).toFixed(0)}% · 역률 {op.power_factor.toFixed(2)}는 가정값이다
-          (제품 스펙 아님).
+          (제품 스펙 아님). 시각은 오른쪽 신호 패널의 시간 축에서 움직인다.
         </p>
       </div>
 
