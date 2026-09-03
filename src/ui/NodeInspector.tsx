@@ -106,7 +106,7 @@ export function NodeInspector({
             ))}
           </div>
         )}
-        {charted.length === 0 && report.iv === null && (
+        {charted.length === 0 && report.iv === null && day === null && (
           <p className="empty">
             이 노드에는 지금 흐르는 전력이 없거나, 계산에 필요한 정격이 확인되지 않았다.
             아래 설명에서 이유를 볼 수 있다.
