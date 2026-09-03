@@ -369,3 +369,28 @@ button, select, input { font: inherit; color: inherit; }
 .time-slider { width: 100%; margin: 2px 0 4px; accent-color: var(--ink); }
 .timebar .hint { margin: 2px 0 0; }
 .port[data-focused="true"] { background: #f1efe9; }
+
+/* ── AI 질문 패널 (스프린트 9) ─────────────────────────── */
+.ask .group + .group { border-top: 1px solid var(--rule); }
+.ask textarea {
+  width: 100%;
+  padding: 6px 7px;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+  font: inherit;
+  resize: vertical;
+}
+.ask .toggle-row { margin-bottom: 8px; }
+.answer { white-space: pre-wrap; font-size: 13px; line-height: 1.6; }
+.ask .disclaimer { padding: 8px 0 0; border-top: none; }
+.brief summary { cursor: pointer; }
+.brief pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-soft);
+  max-height: 260px;
+  overflow: auto;
+  margin: 6px 0 0;
+}

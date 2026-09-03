@@ -17,6 +17,8 @@ import { FindingList } from "./FindingList.js";
 import { DiffTable } from "./DiffTable.js";
 import { NodeInspector } from "./NodeInspector.js";
 import { ProductSheets } from "./ProductSheet.js";
+import { AskPanel } from "./AskPanel.js";
+import { buildBrief } from "../analysis/brief.js";
 import { specSheets } from "../analysis/spec.js";
 import { readState, writeState } from "./urlState.js";
 
@@ -40,6 +42,7 @@ export default function App() {
         options: {},
         node: null,
         op: DEFAULT_OP,
+        asking: false,
       }),
     [],
   );
@@ -56,6 +59,7 @@ export default function App() {
   );
   const [op, setOp] = useState<OperatingPoint>(initial.op);
   const [playing, setPlaying] = useState(false);
+  const [asking, setAsking] = useState(initial.asking);
 
   const location = LOCATIONS.find((l) => l.id === op.location_id) ?? null;
   /** 엔진에 넘기는 동작점 — 위치가 있으면 일사가 (위도, 월, 시각)에서 계산된다. */
@@ -74,8 +78,8 @@ export default function App() {
 
   // 링크가 곧 저장이다. 백엔드가 없으므로 상태를 URL에 남긴다.
   useEffect(() => {
-    writeState({ selected, layers, scenarioId, trip, site, options, node, op });
-  }, [selected, layers, scenarioId, trip, site, options, node, op]);
+    writeState({ selected, layers, scenarioId, trip, site, options, node, op, asking });
+  }, [selected, layers, scenarioId, trip, site, options, node, op, asking]);
 
   const templates = useMemo(
     () => selected.map((id) => CONFIGURATIONS.find((c) => c.id === id)).filter((c) => c !== undefined),
@@ -196,6 +200,30 @@ export default function App() {
     [results],
   );
 
+  /** AI에게 넘길 브리프. 화면에 있는 것만 들어간다 — 새로운 사실을 만들지 않는다. */
+  const brief = useMemo(() => {
+    const target = results.find((r) => r.topology.id === node?.topology) ?? results[0];
+    if (!target) return "";
+    return buildBrief({
+      topology: target.topology,
+      graph: target.graph,
+      devices: DEVICES,
+      flow: target.flow,
+      op: solarOp,
+      location,
+      scenarioName: scenario?.display_name ?? null,
+      options: target.appliedOptions,
+      ruleFindings: target.rules.findings,
+      dataFindings: [
+        ...DATA_FINDINGS.filter((f) => f.where.includes(target.template.id)),
+        ...target.composeFindings,
+        ...(target.flow?.findings ?? []),
+      ],
+      signal: inspected?.report ?? null,
+      focusPort: node?.port ?? null,
+    });
+  }, [results, node, inspected, solarOp, location, scenario]);
+
   // SVG는 문자열로 주입되므로 클릭은 컨테이너에서 위임으로 받는다.
   const canvasRef = useRef<HTMLDivElement>(null);
   const onCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -289,8 +317,16 @@ export default function App() {
               ))}
             </div>
 
-            <span className="label">노드를 클릭하면 신호와 설계 노트가 나온다</span>
+            <span className="label">단자(점)를 클릭하면 신호와 설계 노트가 나온다</span>
             <span className="spacer" />
+            <button
+              type="button"
+              className="toggle"
+              data-on={asking}
+              onClick={() => setAsking((prev) => !prev)}
+            >
+              AI에게 묻기
+            </button>
             <span className="label">도면</span>
             <div className="toggle-row">
               <button type="button" className="toggle" data-on={zoom === "actual"} onClick={() => setZoom("actual")}>
@@ -354,7 +390,9 @@ export default function App() {
         </main>
 
         <aside className="pane right">
-          {inspected ? (
+          {asking ? (
+            <AskPanel brief={brief} onClose={() => setAsking(false)} />
+          ) : inspected ? (
             <NodeInspector
               graph={inspected.graph}
               report={inspected.report}
