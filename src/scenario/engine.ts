@@ -51,14 +51,10 @@ const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery", "dc_ba
 /** DC를 AC로 바꿔 계통에 내보내는 클래스. */
 const INVERTER_CLASSES = new Set([
   "microinverter",
-  "ac_module",
   "string_inverter",
   "hybrid_inverter_battery",
   "ac_battery",
 ]);
-/** PV를 품은 클래스 — 일사가 있어야 낸다. */
-export const PV_CLASSES: ReadonlySet<string> = new Set(["pv_module", "ac_module"]);
-
 type PortDomain = "ac" | "dc" | "other";
 type MidSide = "grid" | "load" | null;
 
@@ -82,7 +78,7 @@ function hasEnergy(graph: RenderGraph, node: RGNode, sc: Scenario): boolean {
     // depleted — 하이브리드는 PV를 직접 변환해 낼 여지가 있다(성립 여부는 아래에서 따로 판정).
     return cls === "hybrid_inverter_battery" && sc.pv === "producing";
   }
-  if (cls === "microinverter" || cls === "ac_module" || cls === "string_inverter") {
+  if (cls === "microinverter" || cls === "string_inverter") {
     if (sc.pv === "producing") return true;
     return attachedDcBatteries(graph, node.ref).some((b) => sc.battery === "available");
   }
@@ -265,8 +261,7 @@ export function evaluateScenario(
   for (const n of graph.nodes) {
     if (tripped.has(n.ref)) continue; // 트립된 장치는 아무것도 내보내지 않는다
     if (n.device.class === "service_point" && scenario.grid === "present") seeds.push(n.ref);
-    // DC를 내는 소스만 여기서 시드가 된다. AC 모듈은 계통 추종 인버터라서
-    // 아일랜드에서 스스로 나설 수 없다 — 아래 인버터 판정을 그대로 따른다.
+    // DC를 내는 소스만 여기서 시드가 된다.
     if (n.device.class === "pv_module" && scenario.pv === "producing") seeds.push(n.ref);
     // DC측 축전지는 인버터에 DC를 대준다. PV와 같은 자리다.
     if (n.device.class === "dc_battery" && scenario.battery === "available") seeds.push(n.ref);

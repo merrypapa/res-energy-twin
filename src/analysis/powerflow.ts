@@ -38,14 +38,13 @@ export interface PowerFlowResult {
 
 const INVERTER_CLASSES = new Set([
   "microinverter",
-  "ac_module",
   "string_inverter",
   "hybrid_inverter_battery",
   "ac_battery",
 ]);
 const BATTERY_CLASSES = new Set(["ac_battery", "hybrid_inverter_battery", "dc_battery"]);
-/** 일사를 전력으로 바꾸는 클래스. AC 모듈은 변환기를 품고 있어 출력이 AC다. */
-const PV_CLASSES = new Set(["pv_module", "ac_module"]);
+/** 일사를 전력으로 바꾸는 클래스. */
+const PV_CLASSES = new Set(["pv_module"]);
 
 function isLive(e: RGEdge, energization: EnergizationMap | null): boolean {
   return energization === null || edgeState(e, energization) === "live";
@@ -128,7 +127,6 @@ function pushAlong(
   let value = kw;
   let at = start;
   // 시작 노드는 자기가 내는 도메인으로 나간다 (모듈은 DC, 축전지·계통은 AC).
-  // AC 모듈도 시작은 DC다 — 변환이 함체 안에서 일어나므로 첫 홉에서 효율이 한 번 먹는다.
   const startClass = graph.byRef.get(start)?.device.class ?? "";
   let arrived: PortDomain = PV_CLASSES.has(startClass) || startClass === "dc_battery" ? "dc" : "ac";
   for (const step of path) {

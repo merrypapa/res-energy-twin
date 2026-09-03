@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import { Device } from "../schema/device.js";
 import { ConfigTemplate } from "../schema/template.js";
 import { NodeNote } from "../schema/note.js";
+import { Location } from "../schema/location.js";
 import { composePresets } from "../config/compose.js";
 import { Topology } from "../schema/topology.js";
 import { Scenario } from "../schema/scenario.js";
@@ -162,4 +163,34 @@ export function loadPresetTopologies(dir: string): LoadResult<Topology> & { temp
     items: presets.items,
     findings: [...cfg.findings, ...presets.findings],
   };
+}
+
+/** 사이트 위치(locations/*.yaml). 일사 계산의 기하 입력이다. */
+export function loadLocations(dir: string): LoadResult<Location> {
+  const items: Location[] = [];
+  const findings: Finding[] = [];
+  for (const file of walk(dir, [".yaml", ".yml"])) {
+    let raw: unknown;
+    try {
+      raw = parseYaml(readFileSync(file, "utf8"));
+    } catch (e) {
+      findings.push({ severity: "error", code: "E000", message: `YAML 파싱 실패: ${String(e)}`, where: file });
+      continue;
+    }
+    const parsed = Location.safeParse(raw);
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        findings.push({
+          severity: "error",
+          code: "E001",
+          message: `스키마 위반 [${issue.path.join(".")}] ${issue.message}`,
+          where: file,
+        });
+      }
+      continue;
+    }
+    items.push(parsed.data);
+  }
+  items.sort((a, b) => a.display_name.localeCompare(b.display_name));
+  return { items, findings };
 }

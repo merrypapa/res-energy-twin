@@ -35,7 +35,6 @@ export function finding(
 /** 전력을 계통에 내보낼 수 있는 클래스. 벤더가 아니라 클래스로만 판정한다. */
 export const SOURCE_CLASSES: ReadonlySet<string> = new Set([
   "microinverter",
-  "ac_module",
   "string_inverter",
   "hybrid_inverter_battery",
   "ac_battery",

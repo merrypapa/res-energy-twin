@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import {
   loadConfigurations,
   loadDevices,
+  loadLocations,
   loadNotes,
   loadScenarios,
   presetTopologies,
@@ -24,6 +25,7 @@ const configurations = loadConfigurations("configurations");
 const topologies = presetTopologies(configurations.items);
 const scenarios = loadScenarios("scenarios");
 const notes = loadNotes("node-notes");
+const locations = loadLocations("locations");
 
 const findings = [
   ...devices.findings,
@@ -31,6 +33,7 @@ const findings = [
   ...topologies.findings,
   ...scenarios.findings,
   ...notes.findings,
+  ...locations.findings,
   ...validateAll(devices.items, topologies.items),
   ...checkNoteCoverage(notes.items, devices.items),
 ];
@@ -48,6 +51,7 @@ const bundle = {
   topologies: topologies.items,
   scenarios: scenarios.items,
   notes: notes.items,
+  locations: locations.items,
   /** 검증기가 낸 error 외 findings. UI가 데이터 품질을 그대로 보여준다. */
   data_findings: findings,
 };
@@ -57,5 +61,6 @@ writeFileSync(OUT, JSON.stringify(bundle), "utf8");
 console.log(
   `${OUT}  ·  devices ${devices.items.length} · configurations ${configurations.items.length} · ` +
     `presets ${topologies.items.length} · scenarios ${scenarios.items.length} · notes ${notes.items.length} · ` +
+    `locations ${locations.items.length} · ` +
     `findings ${findings.length}`,
 );

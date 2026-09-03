@@ -2,6 +2,7 @@ import {
   checkTopology,
   loadConfigurations,
   loadDevices,
+  loadLocations,
   loadNotes,
   loadScenarios,
   presetTopologies,
@@ -15,12 +16,14 @@ const DEVICE_DIR = "device-library";
 const CONFIG_DIR = "configurations";
 const SCENARIO_DIR = "scenarios";
 const NOTE_DIR = "node-notes";
+const LOCATION_DIR = "locations";
 
 const d = loadDevices(DEVICE_DIR);
 const cfg = loadConfigurations(CONFIG_DIR);
 const t = presetTopologies(cfg.items);
 const sc = loadScenarios(SCENARIO_DIR);
 const notes = loadNotes(NOTE_DIR);
+const locations = loadLocations(LOCATION_DIR);
 
 const findings: Finding[] = [
   ...d.findings,
@@ -28,6 +31,7 @@ const findings: Finding[] = [
   ...t.findings,
   ...sc.findings,
   ...notes.findings,
+  ...locations.findings,
   ...validateAll(d.items, t.items),
   ...checkNoteCoverage(notes.items, d.items),
 ];
@@ -78,6 +82,7 @@ const todos = [...d.items, ...cfg.items, ...notes.items].reduce((n, x) => n + x.
 console.log(
   `\ndevices ${d.items.length} · configurations ${cfg.items.length} · presets ${t.items.length} · ` +
     `조합 ${comboCount} · scenarios ${sc.items.length} · notes ${notes.items.length} · ` +
+    `locations ${locations.items.length} · ` +
     `error ${counts.error} · warning ${counts.warning} · info ${counts.info} · open TODO ${todos}`,
 );
 

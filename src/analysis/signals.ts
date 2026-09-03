@@ -77,6 +77,30 @@ export interface NodeSignalReport {
   findings: Finding[];
 }
 
+/**
+ * 이 포트를 나가는 방향을 양으로 한 유효전력(kW). 붙은 도체가 없으면 null.
+ * 신호 패널과 하루 곡선이 같은 정의를 쓰도록 여기 한 곳에 둔다.
+ */
+export function portNetPower(
+  graph: RenderGraph,
+  ref: string,
+  portId: string,
+  flow: PowerFlowResult,
+): number | null {
+  const attached = graph.edges.filter(
+    (e) =>
+      (e.from.nodeRef === ref && e.from.portId === portId) ||
+      (e.to.nodeRef === ref && e.to.portId === portId),
+  );
+  if (attached.length === 0) return null;
+  let sum = 0;
+  for (const e of attached) {
+    const value = flow.edges[e.id] ?? 0;
+    sum += e.from.nodeRef === ref ? value : -value;
+  }
+  return sum;
+}
+
 const SQRT2 = Math.SQRT2;
 const PER_CYCLE = 48;
 const CYCLES = 2;
@@ -201,13 +225,7 @@ export function nodeSignals(
     const basis: string[] = [];
     const formulas: Formula[] = [];
 
-    // 이 포트를 나가는 방향을 양으로 모은다.
-    let pW: number | null = attached.length > 0 ? 0 : null;
-    for (const e of attached) {
-      const value = flow.edges[e.id] ?? 0;
-      pW = (pW ?? 0) + (e.from.nodeRef === ref ? value : -value);
-    }
-    const pKw = pW;
+    const pKw = portNetPower(graph, ref, port.id, flow);
 
     const peers = attached.map((e) => {
       const other = e.from.nodeRef === ref ? e.to.nodeRef : e.from.nodeRef;
