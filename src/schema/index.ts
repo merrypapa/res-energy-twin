@@ -5,3 +5,4 @@ export * from "./scenario.js";
 export * from "./template.js";
 export * from "./note.js";
 export * from "./electrical.js";
+export * from "./location.js";

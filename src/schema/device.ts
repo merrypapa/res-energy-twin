@@ -4,10 +4,10 @@ import { Source, Status, Todo } from "./common.js";
 export const DeviceClass = z.enum([
   "pv_module",
   /**
-   * 마이크로인버터를 공장에서 붙인 모듈. DC 구간이 함체 안에만 있어
-   * 외부에서는 AC만 보인다 — 그래서 DC 포트가 없고, DC 신호도 계산되지 않는다.
+   * AC 모듈(모듈 + 공장 결합 마이크로인버터)은 별도 클래스가 아니다.
+   * 모듈 노드와 마이크로인버터 노드로 나눠 표현한다 — 그래야 모듈의 DC 출력을 볼 수 있다.
+   * 실물이 한 함체라는 사실은 device의 sources/todos에 적는다.
    */
-  "ac_module",
   "microinverter",
   "string_inverter",
   "hybrid_inverter_battery",
