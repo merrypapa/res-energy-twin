@@ -6,6 +6,8 @@ export const Status = z.enum(["verified", "draft"]);
 /** 출처. 숫자 스펙이 하나라도 있으면 최소 1건 필요 (validate.ts에서 강제). */
 export const Source = z.object({
   ref: z.string().min(1),
+  /** 원문 링크(데이터시트·매뉴얼). UI가 그대로 건다. */
+  url: z.string().url().nullable().default(null),
   date: z.string().nullable().default(null),
   note: z.string().nullable().default(null),
 });

@@ -92,7 +92,13 @@ export type Fanout = z.infer<typeof Fanout>;
 export const TemplateNode = z
   .object({
     ref: z.string().regex(/^[a-z0-9_-]+$/),
+    /** 고정 device id. device_from을 쓰면 그 축의 값이 이 자리를 대신한다(기본값 역할). */
     device: z.string().min(1),
+    /**
+     * device를 고르는 옵션 축 id. 축의 선택지 값이 곧 device id다 —
+     * "모듈/인버터/ESS를 고른다"가 이것으로 표현된다. 축 값이 비면 device로 떨어진다.
+     */
+    device_from: z.string().nullable().default(null),
     label: z.string().nullable().default(null),
     count: z.number().int().positive().default(1),
     /** 개수를 옵션 축에서 받는다(배터리 확장 · 병렬 인버터). repeat과 함께 쓰지 않는다. */
@@ -129,6 +135,11 @@ export const ConfigTemplate = z
     vendor: z.string().min(1),
     display_name: z.string().min(1),
     status: Status,
+    /**
+     * vendor = 그 회사의 실제 구성. workbench = 제품을 직접 골라 조합하는 실험용.
+     * 벤더 비교(4분할)의 기본 대상은 vendor만이다 — workbench는 벤더가 아니다.
+     */
+    role: z.enum(["vendor", "workbench"]).default("vendor"),
     /**
      * backup_mode 축이 없을 때 쓰는 고정 범위.
      * backup_mode 축이 있으면 그 값(none|partial|whole_home)이 그대로 backup_scope가 된다.
