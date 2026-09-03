@@ -3,8 +3,10 @@ vendor: Qcells
 display_name: Qcells Q.HOME — AC 결합 (AC 모듈 + COMBINER + HUB + CORE)
 status: draft
 
-# Q.HOME은 AC 결합 시스템이다. 모듈이 각자 AC를 내고 결합반에 모인다 —
-# 어레이에 DC 구간이 없고, 그래서 도면에도 DC 도체가 나오지 않는다.
+# Q.HOME은 AC 결합 시스템이다. 모듈마다 마이크로인버터가 붙어 각자 AC를 내고
+# 트렁크로 결합반에 모인다. Q.TRON AC는 그 둘을 공장에서 결합한 제품이지만,
+# 이 도구는 모듈과 변환기를 노드로 나눈다 — 모듈의 DC 출력이 보여야 하기 때문이다.
+# 현장에 DC 배선이 노출되지 않는다는 제품의 특징은 device의 sources에 적혀 있다.
 options:
   - id: backup_mode
     label: 백업 구성
@@ -20,14 +22,26 @@ options:
       - value: whole_home
         label: 전체 백업
         note: "서비스 도체 위 Q.HOME HUB G3가 계통을 끊는다"
-  - id: ac_module_device
-    label: AC 모듈
+  - id: pv_module_device
+    label: PV 모듈
     kind: enum
-    default: qcells-qtron-blk-m-g2-ac
+    default: qcells-qtron-blk-m-g2
     choices:
-      - value: qcells-qtron-blk-m-g2-ac
-        label: Q.TRON BLK M-G2+/AC 440
-        note: "마이크로인버터 일체형. DC가 함체 밖으로 나오지 않는다"
+      - value: qcells-qtron-blk-m-g2
+        label: Q.TRON BLK M-G2+ 440
+        note: "Q.TRON AC의 모듈 부분. STC 전기 정격이 미입력이라 DC 전압·전류는 계산되지 않는다"
+      - value: generic-pv-module-400w
+        label: PV 모듈 400W (모델링 기준)
+        note: "전기 정격이 들어 있어 DC 전압·전류까지 계산된다"
+  - id: micro_device
+    label: 마이크로인버터
+    kind: enum
+    default: qcells-qtron-ac-microinverter
+    choices:
+      - value: qcells-qtron-ac-microinverter
+        label: Q.TRON AC 내장 마이크로인버터
+        note: "모듈과 한 함체다. 변환기 정격은 확인 전이다"
+      - { value: enphase-iq8m, label: "Enphase IQ8M (325 VA)" }
   - id: battery_device
     label: 축전지 모델
     kind: enum
@@ -35,7 +49,7 @@ options:
     choices:
       - { value: qcells-qhome-core-g3, label: "Q.HOME CORE G3 (13.1 kWh · 7.6 kW)" }
   - id: pv_modules
-    label: AC 모듈 수
+    label: 모듈 수
     kind: int
     min: 1
     max: 44
@@ -72,10 +86,15 @@ nodes:
     when: { backup_mode: [partial] }
   - { ref: comb, device: qcells-qhome-combiner-80-g1, label: Q.HOME COMBINER 80 }
   - { ref: core, device: qcells-qhome-core-g3, device_from: battery_device, label: Q.HOME CORE, count_from: battery_units }
-  - ref: acm
-    device: qcells-qtron-blk-m-g2-ac
-    device_from: ac_module_device
-    label: Q.TRON AC
+  - ref: pv
+    device: qcells-qtron-blk-m-g2
+    device_from: pv_module_device
+    label: PV
+    repeat: { count: pv_modules, chunk: branch_size }
+  - ref: mi
+    device: qcells-qtron-ac-microinverter
+    device_from: micro_device
+    label: MI
     repeat: { count: pv_modules, chunk: branch_size }
 
 edges:
@@ -100,12 +119,16 @@ edges:
     when: { backup_mode: [partial] }
     conductor: { ocpd_a: null }
 
-  # ── AC 모듈: 모듈이 각자 AC를 내고 트렁크로 모인다 ────────
-  - from: acm.ac_out
-    to: acm.trunk_in
+  # ── 모듈 → 내장 마이크로인버터 → 트렁크 → 결합반 ──────────
+  - from: pv.dc_out
+    to: mi.dc_in
+    fanout: pairwise
+    conductor: { note: "모듈 단위 DC. 실물은 한 함체 안이라 현장에 DC 배선이 노출되지 않는다" }
+  - from: mi.ac_out
+    to: mi.trunk_in
     fanout: chain
-    conductor: { note: "AC 트렁크 — 하류로 갈수록 모듈 전류가 누적된다" }
-  - from: acm.ac_out
+    conductor: { note: "AC 트렁크 — 하류로 갈수록 유닛 전류가 누적된다" }
+  - from: mi.ac_out
     to: comb.pv_ac_in
     fanout: chunk_last
     conductor: { ocpd_a: null, note: "분기회로 종단 → 결합반 차단기" }
@@ -130,7 +153,8 @@ presets:
   - id: qcells-qhome-core-g3-whole-home
     display_name: "Q.TRON AC + COMBINER 80 + HUB G3 + CORE G3 — 전체 백업"
     options: { backup_mode: whole_home, pv_modules: 20, branch_size: 10, battery_units: 1,
-               ac_module_device: qcells-qtron-blk-m-g2-ac, battery_device: qcells-qhome-core-g3 }
+               pv_module_device: qcells-qtron-blk-m-g2, micro_device: qcells-qtron-ac-microinverter,
+               battery_device: qcells-qhome-core-g3 }
 
 sources:
   - ref: "Qcells Q.HOME CORE G3 / Q.TRON AC / Q.HOME COMBINER 공식 페이지 및 문서"
@@ -141,5 +165,6 @@ sources:
       PDF 원문 열람이 이 환경에서 차단되어 공식 페이지·문서 표기로 확인했다
 todos:
   - "HUB G3의 서비스 정격과 전환 방식 확인"
-  - "AC 모듈 내장 마이크로인버터의 연속 출력이 null이라 트렁크 전류가 정격 기반으로만 계산된다"
+  - "내장 마이크로인버터의 연속 출력이 null이라 클리핑을 판정하지 않는다"
+  - "모듈과 변환기를 두 노드로 나눴다 — 부품 수 비교에서 한 함체를 2개로 셀지 결정 필요"
   - "결합반 PV 회로 4계통 한도와 분기당 모듈 수 한도를 매뉴얼에서 확인할 것"

@@ -1,0 +1,33 @@
+id: qcells-qtron-ac-microinverter
+vendor: Qcells
+display_name: Q.TRON AC 내장 마이크로인버터
+class: microinverter
+status: draft
+ratings:
+  # AC 모듈의 변환기 부분. 제조사가 별도 데이터시트를 내지 않아 전 수치가 미확인이다.
+  continuous_ac_kva: null
+  peak_ac_kw: null
+  cec_efficiency_pct: null
+ports:
+  - { id: dc_in, type: dc_pv_module, direction: in }
+  - { id: trunk_in, type: ac_240v_split, direction: in }
+  - { id: ac_out, type: ac_240v_split, direction: out }
+provides_mid: false
+grid_forming: null
+black_start_capable: null
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Qcells Q.TRON AC MODULE 415–440 데이터시트 (북미)"
+    url: "https://us.qcells.com/wp-content/uploads/2024/09/Qcells_Data_sheet_Q.TRON_AC_MODULE_series_415-440_2024-08_Rev03_NA.pdf"
+    date: "2026-09-03"
+    note: >-
+      Q.TRON AC는 모듈에 마이크로인버터를 공장에서 붙인 제품이다. 이 도구는 그 둘을
+      노드로 나눠 모듈의 DC 출력을 볼 수 있게 한다 — 실제로는 한 함체이며,
+      DC 배선이 현장에 노출되지 않는다는 점이 제품의 특징이다.
+      변환기 정격은 PDF 원문 열람이 차단되어 확인하지 못했다
+todos:
+  - "연속 AC 출력·피크·CEC 효율 확인. 채우기 전까지 클리핑 판정을 하지 않는다"
+  - "모듈과 한 몸이라 실제로는 별도 결선 포인트가 아니다 — 부품 수 비교에서 이 점을 어떻게 셀지 결정"

@@ -15,9 +15,6 @@ options:
     kind: enum
     default: micro
     choices:
-      - value: ac_module
-        label: AC 모듈 (변환기 일체형)
-        note: "모듈이 각자 AC를 낸다. 어레이에 DC 구간이 없다"
       - value: micro
         label: 모듈 + 마이크로인버터
         note: "모듈 1장에 인버터 1대. 모듈 단위 MPPT"
@@ -50,17 +47,12 @@ options:
     choices:
       - { value: generic-pv-module-400w, label: "PV 모듈 400W (모델링 기준)", note: "전기 정격이 들어 있어 DC 신호가 계산된다" }
       - { value: qcells-qtron-blk-m-g2, label: "Qcells Q.TRON BLK M-G2+ 440", note: "STC 전기 정격 미입력 — DC 전압·전류는 계산되지 않는다" }
-  - id: ac_module_device
-    label: AC 모듈
-    kind: enum
-    default: qcells-qtron-blk-m-g2-ac
-    choices:
-      - { value: qcells-qtron-blk-m-g2-ac, label: "Qcells Q.TRON BLK M-G2+/AC 440" }
   - id: micro_device
     label: 마이크로인버터
     kind: enum
     default: enphase-iq8m
     choices:
+      - { value: qcells-qtron-ac-microinverter, label: "Qcells Q.TRON AC 내장 (정격 미확인)" }
       - { value: enphase-iq8plus, label: "Enphase IQ8+ (290 VA)" }
       - { value: enphase-iq8m, label: "Enphase IQ8M (325 VA)" }
       - { value: enphase-iq8a, label: "Enphase IQ8A (349 VA)" }
@@ -137,7 +129,7 @@ nodes:
   - ref: comb
     device: generic-ac-combiner
     device_from: combiner_device
-    when: { coupling: [ac_module, micro] }
+    when: { coupling: [micro] }
   - ref: inv
     device: solaredge-home-hub-se7600h
     device_from: inverter_device
@@ -160,12 +152,6 @@ nodes:
     label: PV
     repeat: { count: pv_modules, chunk: string_size }
     when: { coupling: [micro, dc_string] }
-  - ref: acm
-    device: qcells-qtron-blk-m-g2-ac
-    device_from: ac_module_device
-    label: AC 모듈
-    repeat: { count: pv_modules, chunk: string_size }
-    when: { coupling: [ac_module] }
   - ref: mi
     device: enphase-iq8m
     device_from: micro_device
@@ -181,11 +167,6 @@ edges:
   - { from: msp.branch, to: mid.grid_in, when: { backup_mode: [partial] }, conductor: { ocpd_a: null } }
   - { from: mid.load_out, to: sub.feed, when: { backup_mode: [partial] }, conductor: { ocpd_a: null } }
 
-  # ── AC 모듈 ─────────────────────────────────────────────
-  - { from: acm.ac_out, to: acm.trunk_in, fanout: chain, when: { coupling: [ac_module] },
-      conductor: { note: "AC 트렁크 — 전류가 누적된다" } }
-  - { from: acm.ac_out, to: comb.pv_ac_in, fanout: chunk_last, when: { coupling: [ac_module] } }
-
   # ── 모듈 + 마이크로인버터 ────────────────────────────────
   - { from: pv.dc_out, to: mi.dc_in, fanout: pairwise, when: { coupling: [micro] } }
   - { from: mi.ac_out, to: mi.trunk_in, fanout: chain, when: { coupling: [micro] },
@@ -200,9 +181,9 @@ edges:
       when: { coupling: [dc_string], battery_type: [dc] } }
 
   # ── 결합반 · 인버터 출력 ────────────────────────────────
-  - { from: comb.main_ac, to: msp.branch, when: { coupling: [ac_module, micro], backup_mode: ["none", whole_home] },
+  - { from: comb.main_ac, to: msp.branch, when: { coupling: [micro], backup_mode: ["none", whole_home] },
       conductor: { ocpd_a: null, note: "부하측 인터커넥션" } }
-  - { from: comb.main_ac, to: sub.branch, when: { coupling: [ac_module, micro], backup_mode: [partial] },
+  - { from: comb.main_ac, to: sub.branch, when: { coupling: [micro], backup_mode: [partial] },
       conductor: { ocpd_a: null } }
   - { from: inv.ac_out, to: msp.branch, fanout: each, when: { coupling: [dc_string], backup_mode: ["none", whole_home] },
       conductor: { ocpd_a: null } }
@@ -211,7 +192,7 @@ edges:
 
   # ── AC 결합 ESS ─────────────────────────────────────────
   - { from: battac.ac_out, to: comb.battery_ac, fanout: each,
-      when: { coupling: [ac_module, micro], battery_type: [ac] } }
+      when: { coupling: [micro], battery_type: [ac] } }
   - { from: battac.ac_out, to: msp.branch, fanout: each,
       when: { coupling: [dc_string], battery_type: [ac], backup_mode: ["none", whole_home] } }
   - { from: battac.ac_out, to: sub.branch, fanout: each,
@@ -219,9 +200,9 @@ edges:
 
   # ── 통신 ────────────────────────────────────────────────
   - { from: battac.comms, to: comb.comms, layer: comms, fanout: each,
-      when: { coupling: [ac_module, micro], battery_type: [ac] } }
+      when: { coupling: [micro], battery_type: [ac] } }
   - { from: mid.comms, to: comb.comms, layer: comms,
-      when: { coupling: [ac_module, micro], backup_mode: [partial, whole_home] } }
+      when: { coupling: [micro], backup_mode: [partial, whole_home] } }
   - { from: inv.comms, to: mid.comms, layer: comms, fanout: first,
       when: { coupling: [dc_string], backup_mode: [partial, whole_home] } }
 

@@ -1,0 +1,14 @@
+id: phoenix-az
+display_name: 피닉스, AZ
+region: US Southwest
+latitude_deg: 33.45
+longitude_deg: -112.07
+utc_offset_hours: -7
+sources:
+  - ref: "도시 대표 좌표 (근사)"
+    date: "2026-09-03"
+    note: >-
+      실제 사이트 좌표가 아니라 지역을 고르기 위한 대표값이다. 일사 계산에는 위도만 쓰인다.
+      표준시 오프셋은 서머타임을 반영하지 않는다
+todos:
+  - "실제 사이트 좌표를 넣을 수 있게 입력 필드를 열지 결정"
