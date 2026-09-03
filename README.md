@@ -3,9 +3,10 @@
 미국 주택용 태양광 + ESS 시스템의 전기적 구성을 데이터로 기술하고, 검증하고,
 벤더 간 비교하기 위한 사내 레퍼런스. 설계 원칙과 범위는 [CLAUDE.md](./CLAUDE.md) 참조.
 
-**현재 스프린트 6 완료.**
+**현재 스프린트 7 완료.**
 스키마 · 검증기 · SLD 렌더러 · 시나리오 엔진 · 룰 엔진 · 비교 · 브라우저 앱 · Pages 배포 ·
-구성 컴포저(옵션 축) · 배열 전개(모듈 1장 = 1노드) · 노드 신호(V·I·P + 수식) · 노드 노트.
+구성 컴포저(옵션 축) · 배열 전개(모듈 1장 = 1노드) · 노드 신호(V·I·P + 수식) · 노드 노트 ·
+제조사 제품 라이브러리(데이터시트 링크 + 스펙 요약) · Customize 구성.
 
 앱은 `npm run dev`. 렌더러 · 시나리오 · 룰 · 비교 엔진이 브라우저에서 그대로 돌고,
 UI 전용 로직은 없다. 상태는 URL 해시에 담기므로 링크를 그대로 공유할 수 있다.
@@ -39,6 +40,7 @@ npm run typecheck
 | `device-library/` | 제품 스펙 (YAML, 1제품 1파일) |
 | `configurations/` | 구성 템플릿 (YAML, 1벤더 1파일) — 옵션 축 + 프리셋 |
 | `node-notes/` | 노드 포인트의 설계·기능 노트 (YAML) |
+| `src/analysis/spec.ts` | 제품 스펙 요약 (정격 표 → 화면 줄) |
 | `scenarios/` | 운전 상태 정의 (JSON) |
 | `rules/` | 코드 체크 룰 (1룰 1파일, 순수 함수) |
 | `src/render/` | 그래프 → 계층 배치 → SVG (벤더 분기문 없음) |
@@ -109,6 +111,8 @@ npm run typecheck
 | 축 | 값 |
 |---|---|
 | `backup_mode` | `none`(grid support) · `partial` · `whole_home` — 값이 곧 backup_scope다 |
+| `coupling` (Customize) | `ac_module` · `micro` · `dc_string` — 결합 방식이 결선 구조를 바꾼다 |
+| `*_device` | 그 자리의 제품 (`device_from`). 모듈 · 마이크로인버터 · 인버터 · ESS · MID · 결합반 |
 | `mid_device` / `controller` | Backup Switch vs Gateway 3, MSC vs 게이트웨이 |
 | `battery_units` / `ess_units` / `inverter_units` | 확장·병렬 대수. 0이면 그 장치가 사라진다 |
 | `pv_modules` | 모듈 수. 마이크로인버터 수와 항상 같다 |
@@ -118,6 +122,22 @@ npm run typecheck
 `requires_one_of`를 만족하지 못해 E025가 뜬다 — 그 판정을 보여주는 것이 이 도구의 목적이다.
 `npm run validate`는 모든 enum 조합을 펴서 컴포저 결함만 error로 잡고,
 성립하지 않는 조합은 `C040` 정보로 남긴다.
+
+## 제품 라이브러리
+
+벤더를 고르면 그 회사의 대표 제품이 기본값으로 들어간다. `Customize`를 고르면 자리마다
+제품을 직접 고른다. 오른쪽 패널에 선택된 제품의 스펙 요약과 **데이터시트 원문 링크**가 뜬다.
+
+| 벤더 | 기본 구성 |
+|---|---|
+| Enphase | IQ8M 마이크로인버터 · IQ Battery 5P · IQ Combiner 6C · IQ Meter Collar |
+| Tesla | Powerwall 3 · Backup Switch (또는 Gateway 3) |
+| SolarEdge | Home Hub SE7600H · Home Battery 400V(DC측) · Backup Interface |
+| Qcells | Q.TRON AC 모듈 · Q.HOME COMBINER 80 · Q.HOME HUB G3 · Q.HOME CORE G3 (**AC 결합**) |
+
+제품 스펙은 제조사 공식 문서에서만 옮긴다. 확인하지 못한 값은 `null`로 두고 데이터시트
+링크를 남긴다 — 예를 들어 Q.TRON 모듈의 STC 전기 정격(Vmp/Imp/Voc/Isc)이 그렇고,
+그 모듈을 고르면 DC 전압·전류가 계산되지 않고 이유가 화면에 뜬다.
 
 ## 노드 신호
 

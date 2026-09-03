@@ -50,9 +50,9 @@ src/ui/             React 앱
 ```yaml
 id: tesla-powerwall-3
 vendor: Tesla
-class: hybrid_inverter_battery   # pv_module | microinverter | string_inverter |
-                                 # hybrid_inverter_battery | ac_battery |
-                                 # mid | combiner | main_panel | meter | subpanel
+class: hybrid_inverter_battery   # pv_module | ac_module | microinverter | string_inverter |
+                                 # hybrid_inverter_battery | ac_battery | dc_battery |
+                                 # mid | combiner | main_panel | subpanel | service_point
 display_name: Powerwall 3
 ratings:
   usable_energy_kwh: 13.5
@@ -75,6 +75,13 @@ sources:
 
 **규칙:** 스펙 값에는 반드시 `sources`를 단다. 출처 없는 숫자는 커밋하지 않는다.
 모르면 `null`을 쓰고 `TODO` 주석을 남긴다. 추정치를 확정값처럼 넣지 않는다.
+제조사 제품이면 `sources[].url`에 데이터시트 원문 링크와 `date`(확인일)를 함께 남긴다 —
+정격도 승인 현황도 시점에 따라 바뀐다. 이 두 가지는 테스트가 강제한다.
+
+**class는 마케팅 명칭이 아니라 전기적 구조로 정한다.** 축전지가 함체 안에 있으면
+`hybrid_inverter_battery`, DC측에 별도로 붙으면 인버터는 `string_inverter`이고 축전지는
+`dc_battery`다. 이 구분이 "축전지 없이 야간 아일랜드가 성립하는가"의 판정을 가른다.
+변환기를 품은 모듈은 `ac_module`이며 DC 포트를 갖지 않는다 — DC가 함체 밖으로 나오지 않는다.
 
 ### 3.2 configurations (구성 템플릿)
 
@@ -92,6 +99,8 @@ options:
   - { id: pv_modules, kind: int, min: 1, max: 40, default: 20 }
 nodes:
   - { ref: collar, device: enphase-iq-meter-collar, when: { backup_mode: [whole_home] } }
+  # device_from: 그 자리의 제품을 옵션으로 고른다 (모듈 · 인버터 · ESS 선택)
+  - { ref: mi, device: enphase-iq8m, device_from: micro_device, repeat: { count: pv_modules } }
   - { ref: pv, device: generic-pv-module-400w, repeat: { count: pv_modules, chunk: branch_size } }
 edges:
   - { from: pv.dc_out, to: mi.dc_in, fanout: pairwise }   # 모듈 i ↔ 인버터 i
@@ -140,10 +149,11 @@ UI에서 토글된다.
 
 | ID | 핵심 특징 |
 |---|---|
-| Tesla PW3 + Backup Switch | 미터 뒤 전환, 단일 유닛 11.5kW / 185 LRA |
-| Enphase 4th-gen (IQ Battery + Combiner 6C + IQ Meter Collar) | 미터 컬러가 MID — 백업 서브패널 및 부하 재배선 불필요 |
-| SolarEdge (Nexis 계열) | DC 결합, 스트링 구조 |
-| Qcells G4 ESS (MSC/MID 구성) | 내부 사양 기준. 미확정 항목은 `null` + TODO |
+| Tesla PW3 + Backup Switch / Gateway 3 | 미터 뒤 전환, 단일 유닛 11.5kW / 185 LRA / MPPT 6개(60–480V) |
+| Enphase 4th-gen (IQ8 + IQ Battery 5P·10C + Combiner 6C + IQ Meter Collar) | 미터 컬러가 MID — 백업 서브패널 및 부하 재배선 불필요 |
+| SolarEdge Home Hub + Home Battery 400V + Backup Interface | DC 결합. 축전지가 DC측 별도 노드다 |
+| Qcells Q.HOME (Q.TRON AC + COMBINER + HUB G3 + CORE G3) | **AC 결합**. AC 모듈이 트렁크로 결합반에 모인다 |
+| Customize | 모듈 · 인버터 · ESS를 직접 골라 조합한다 (`device_from`) |
 
 동일 스키마로 표현되는 순간, 부품 수 / 서브패널 필요 여부 / 결선 포인트 수가
 자동으로 비교된다. 이것이 이 프로젝트의 핵심 산출물이다.
@@ -245,6 +255,7 @@ DC→AC 지점에서 한 번만 먹인다.
 | 4 | 4종 확장 + 비교 모드 | 벤더별 차이가 표로 자동 생성 |
 | 5 | GitHub Pages 배포 + 기여 가이드 | 데이터 PR만으로 제품 추가 가능 |
 | 6 | 배열 전개 + 구성 컴포저 + 노드 신호 | 모듈 1장 = 1노드, 구성 옵션 선택, 노드 클릭 시 V·I·P와 근거 |
+| 7 | 실제 제품 라이브러리 + Customize | 벤더별 대표 제품이 기본값, 제품 선택, 데이터시트 링크와 스펙 요약 |
 
 스프린트 0을 건너뛰고 UI부터 만들지 말 것.
 

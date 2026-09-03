@@ -101,12 +101,24 @@ describe("정전 — 아일랜딩", () => {
     expect(run(enphase, "outage_islanded").injectors).toContain("batt");
   });
 
-  it("계통 정상 대비 경로가 실제로 바뀐다 — 스프린트 2 완료 기준", () => {
+  /**
+   * MID가 확정된 구성에서만 경로가 바뀐다. provides_mid가 미확인(null)인 자리표시자를
+   * 쓰는 구성은 엔진이 개방 주체로 쓰지 않으므로 경로가 그대로다 —
+   * 그 사실을 S023으로 알리는 것이 정답이고, 조용히 개방해 버리는 것이 오답이다.
+   */
+  it("MID가 확정된 구성은 정전에서 경로가 실제로 바뀐다 — 스프린트 2 완료 기준", () => {
     for (const t of topologies) {
       const normal = evaluateScenario(t, devices, scen("grid_normal"));
       const outage = evaluateScenario(t, devices, scen("outage_islanded"));
-      expect(outage.energization).not.toEqual(normal.energization);
-      expect(liveEdges(outage).length).toBeLessThan(liveEdges(normal).length);
+      const graph = buildRenderGraph(t, devices, ["power"]);
+      const confirmedMid = graph.nodes.some((n) => n.device.provides_mid === true);
+      if (confirmedMid) {
+        expect(outage.energization).not.toEqual(normal.energization);
+        expect(liveEdges(outage).length).toBeLessThan(liveEdges(normal).length);
+      } else if (liveEdges(outage).length === liveEdges(normal).length) {
+        // 경로가 그대로라면 반드시 그 이유(개방 주체 미확인)가 남아 있어야 한다.
+        expect(codes(outage)).toContain("S023");
+      }
     }
   });
 });
@@ -193,6 +205,11 @@ describe("물리 규칙 — 모든 토폴로지 × 모든 시나리오", () => {
         if (r.energization[e.id] !== "live") continue;
         const dc = e.from.port.type.startsWith("dc_") || e.to.port.type.startsWith("dc_");
         if (!dc) continue;
+        // DC측 축전지는 해가 없어도 DC 도체를 살린다 — 그건 역급전이 아니라 방전이다.
+        const fromBattery = [e.from.nodeRef, e.to.nodeRef].some(
+          (ref) => graph.byRef.get(ref)?.device.class === "dc_battery",
+        );
+        if (fromBattery) continue;
         // DC 회로가 살아 있으려면 PV가 발전 중이어야 한다.
         expect(`${t.id}/${s.id}/${e.id}: pv=${s.pv}`).toBe(`${t.id}/${s.id}/${e.id}: pv=producing`);
       }

@@ -53,10 +53,10 @@ describe("비교표", () => {
   });
 
   it("값이 없으면 빈칸이 아니라 미확인으로 나온다 — 빈칸은 0으로 읽힌다", () => {
+    // 제품 데이터가 들어오면서 용량·출력은 채워졌다. 아직 확인되지 않은 값(LRA)은 미확인으로 남는다.
     const c = cmp(pick("qcells"));
-    expect(cell(c, "continuous", "Qcells")).toBe(UNKNOWN);
-    expect(cell(c, "energy", "Qcells")).toBe(UNKNOWN);
     expect(cell(c, "lra", "Qcells")).toBe(UNKNOWN);
+    expect(cell(c, "energy", "Qcells")).not.toBe("");
   });
 
   it("kW와 kVA를 합치지 않는다", () => {
@@ -67,7 +67,8 @@ describe("비교표", () => {
   });
 
   it("정격이 없는 전원이 합산에서 빠진 사실을 표시한다", () => {
-    expect(cell(cmp(pick("enphase")), "continuous", "Enphase")).toContain("미기재 20건 제외");
+    // Qcells AC 모듈은 내장 마이크로인버터의 연속 출력이 미확인이라 합산에서 빠진다.
+    expect(cell(cmp(pick("qcells")), "continuous", "Qcells")).toContain("미기재 20건 제외");
   });
 
   it("MID가 확정되지 않은 구성은 그 사실을 노트로 남긴다", () => {
@@ -98,10 +99,19 @@ describe("시나리오 연동", () => {
     expect(c.rows.find((r) => r.key === "energized")).toBeUndefined();
   });
 
-  it("아일랜드를 세우지 못하는 구성이 구분된다", () => {
+  it("아일랜드를 세운 주체가 표에 나온다", () => {
     const c = cmp(pick("tesla", "qcells"), { scenario: outage });
     expect(cell(c, "island", "Tesla")).toBe("pw3");
-    expect(cell(c, "island", "Qcells")).toBe("형성 안 됨");
+    // Qcells는 CORE G3(그리드 포밍)가 세우고, AC 모듈들이 그 뒤에 실린다
+    expect(cell(c, "island", "Qcells")).toContain("core");
+  });
+
+  it("그리드 포밍이 확인되지 않은 구성은 형성 안 됨으로 나온다", () => {
+    const noForming = devices.map((d) =>
+      d.grid_forming === true ? Device.parse({ ...d, grid_forming: null }) : d,
+    );
+    const c = compareTopologies(pick("tesla"), noForming, { scenario: outage });
+    expect(c.rows.find((r) => r.key === "island")!.cells[0]).toBe("형성 안 됨");
   });
 });
 

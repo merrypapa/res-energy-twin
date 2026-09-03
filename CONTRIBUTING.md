@@ -42,11 +42,14 @@ ratings:
   continuous_ac_kw: 11.5
 sources:
   - ref: "제조사 설치 매뉴얼 rev C"
+    url: "https://example.com/datasheet.pdf"   # 원문 링크. 화면에서 그대로 걸린다
     date: "2026-08"        # 확인한 날. 승인 현황처럼 변하는 값에 특히 중요하다
     note: "표 3.1"
 ```
 
 출처 없이 숫자를 넣으면 `E010` 으로 CI가 막는다.
+제조사 제품(vendor ≠ generic)이 숫자 스펙을 가지면 `url`과 `date`가 있어야 한다 —
+`tests/products.test.ts`가 강제한다.
 
 ## 새 구성 추가
 
@@ -83,6 +86,8 @@ presets:
 - 노드를 `when`으로 가렸으면 그 노드를 쓰는 엣지에도 같은 `when`을 달아라. 아니면 `C020`
 - `fanout`: `single` · `pairwise`(i↔i) · `chain`(i→i+1, 묶음 경계를 넘지 않는다) ·
   `chunk_last`(묶음 종단 → 도착지) · `each` · `first`(대표 유닛만)
+- `device_from: <축 id>`를 달면 그 자리의 제품을 옵션으로 고른다. 축의 선택지 값이 device id다 —
+  이것으로 "모듈/인버터/ESS 고르기"가 데이터만으로 표현된다
 - **배열은 축약하지 않는다.** 모듈 20장은 `repeat`으로 20노드가 된다.
   `count: 20`으로 뭉치면 부품 수·결선 포인트·신호 계산이 전부 틀어진다
 - MID를 내장한 장치라면 포트에 `mid_side: grid | load` 를 달아라.
@@ -115,10 +120,12 @@ sources:
 
 | class | 쓰임 |
 |---|---|
-| `pv_module` | PV 모듈/어레이 |
+| `pv_module` | PV 모듈 (DC 출력) |
+| `ac_module` | 변환기 일체형 모듈. DC 포트가 없다 |
 | `microinverter` / `string_inverter` | 계통 추종 인버터 |
-| `hybrid_inverter_battery` | 인버터 + 축전지 일체 |
+| `hybrid_inverter_battery` | 인버터 + 축전지 **일체** |
 | `ac_battery` | AC 결합 축전지 |
+| `dc_battery` | DC측 축전지. 스스로 AC를 내지 못한다 |
 | `mid` | 계통 분리 장치 |
 | `combiner` | 전원 결합반 |
 | `main_panel` / `subpanel` | 배전반 |

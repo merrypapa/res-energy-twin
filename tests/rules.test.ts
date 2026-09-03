@@ -13,6 +13,7 @@ const devices = loadDevices("device-library").items;
 const topologies = loadPresetTopologies("configurations").items;
 const tesla = topologies.find((t) => t.id.startsWith("tesla"))!;
 const enphase = topologies.find((t) => t.id.startsWith("enphase"))!;
+const qcells = topologies.find((t) => t.id.startsWith("qcells"))!;
 
 const site = (o: Partial<SiteContext>) => SiteContext.parse(o);
 const run = (t = tesla, s = EMPTY_SITE, d = devices) => runRules(t, d, s);
@@ -178,7 +179,8 @@ describe("R030 — 백업 부하 대비 연속 출력", () => {
   });
 
   it("정격 없는 전원이 합산에서 빠진 사실을 숨기지 않는다", () => {
-    expect(find(run(enphase), "R030.1")?.message).toContain("enphase-iq8-microinverter");
+    // Qcells AC 모듈은 내장 마이크로인버터의 연속 출력이 아직 확인되지 않았다.
+    expect(find(run(qcells), "R030.1")?.message).toContain("qcells-qtron-blk-m-g2-ac");
   });
 
   it("count가 반영된다 — 유닛을 늘리면 합계가 커진다", () => {
