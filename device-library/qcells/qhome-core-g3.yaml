@@ -17,6 +17,28 @@ requires_one_of: [qcells-qhome-hub-g3]
 needs_backup_subpanel: "no"
 certifications: []
 utility_approval: null
+internals:
+  blocks:
+    - { id: cells, display_name: 축전지 셀(LFP), kind: cells, port: null,
+        note: "LG에너지솔루션 LFP. 사용 가능 용량은 device.ratings.usable_energy_kwh" }
+    - { id: pcs, display_name: 양방향 변환기, kind: converter, port: ac_out,
+        note: "AC 결합이므로 충·방전 모두 이 변환기를 지난다. 백업 출력은 device.ratings.continuous_ac_kw" }
+    - { id: bms, display_name: 제어·통신부, kind: controller, port: comms, count: null,
+        note: "HUB G3와의 협조 제어 경로. 내부 구성은 미확인" }
+  links:
+    - { from: cells, to: pcs, domain: dc }
+    - { from: pcs, to: bms, domain: signal }
+  sources:
+    - ref: "Qcells Q.HOME CORE G3 제품 페이지 / 브로슈어"
+      url: "https://us.qcells.com/qhome-core-g3/"
+      date: "2026-09-03"
+      note: >-
+        AC 결합 ESS이고 LFP 셀을 쓴다는 서술에서 도출한 구조다. 셀 + 양방향 변환기는
+        AC 결합 ESS의 정의상 구성이며, 함체 내부 배치도를 대조한 것이 아니다
+  todos:
+    - "변환기와 셀이 실제로 한 함체인지, 모듈 단위로 분리되는지 확인 (2대 병렬 구성과 관련)"
+    - "제어·통신부가 별도 기판인지 변환기에 통합인지 확인"
+    - "내부 DC 링크 전압 확인 — 확인되면 블록에 정격을 채운다"
 sources:
   - ref: "Qcells Q.HOME CORE G3 제품 페이지 / 브로슈어"
     url: "https://us.qcells.com/qhome-core-g3/"

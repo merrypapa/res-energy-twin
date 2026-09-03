@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { Source, Status, Todo } from "./common.js";
+import { Internals } from "./internals.js";
 
 export const DeviceClass = z.enum([
   "pv_module",
@@ -137,6 +138,11 @@ export const Device = z
     needs_backup_subpanel: z.enum(["yes", "no", "conditional", "unknown"]).default("unknown"),
     certifications: z.array(z.string()).default([]),
     utility_approval: UtilityApproval.nullable().default(null),
+    /**
+     * 함체 내부 구성. 단선도에는 한 상자로 그리고, 장치를 고르면 그 안을 보여준다.
+     * 계산은 이 값을 보지 않는다 — 확인되지 않은 내부 구조가 조류·룰에 새면 안 된다.
+     */
+    internals: Internals.nullable().default(null),
     sources: z.array(Source).default([]),
     todos: z.array(Todo).default([]),
   })

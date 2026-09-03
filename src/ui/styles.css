@@ -383,3 +383,8 @@ button, select, input { font: inherit; color: inherit; }
   overflow: auto;
   margin: 6px 0 0;
 }
+
+/* 함체 내부 블록도 — 단선도와 같은 종이 위에 놓는다. 카드에 담지 않는다 */
+.internals { margin: 10px 0 4px; }
+.internals-sheet { margin-top: 8px; }
+.internals-sheet svg { display: block; width: 100%; height: auto; }

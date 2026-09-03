@@ -129,6 +129,29 @@ sources:
   - { ref: "...", date: "2026-09", note: null }
 ```
 
+## 함체 내부 구조
+
+단선도는 한 함체를 한 상자로 그린다 — 그것이 단선도의 정의다. 그 안이 어떻게
+갈라지는지는 device의 `internals`에 적고, 제품 카드에서 따로 펼쳐 본다.
+
+```yaml
+internals:
+  blocks:
+    - { id: cells, display_name: 축전지 셀, kind: cells, port: null }
+    - { id: pcs, display_name: 양방향 변환기, kind: converter, port: ac_out }
+    - { id: brk, display_name: 분기 차단기, kind: breaker, port: pv_ac_in,
+        ocpd_a: null, count: 4 }     # 개수·정격을 모르면 null
+  links:
+    - { from: cells, to: pcs, domain: dc }
+  sources: [...]                      # 어느 문서에서 도출했는지
+  todos: ["내부 결선도 원문 대조"]
+```
+
+- `kind`: converter · cells · breaker · busbar · meter · contactor · controller · other
+- `port`는 device.ports의 id여야 한다 (테스트로 강제)
+- **계산은 이 값을 보지 않는다.** 조류도 룰도 내부 구조를 읽지 않는다 —
+  확인되지 않은 내부 구성이 판정에 새어 들어가면 안 된다. 읽기 위한 기술이다
+
 ## device class
 
 심볼과 엔진 동작이 class에서 정해진다. 벤더나 제품 id로 분기하는 코드는 없다.

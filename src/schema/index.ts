@@ -6,3 +6,4 @@ export * from "./template.js";
 export * from "./note.js";
 export * from "./electrical.js";
 export * from "./location.js";
+export * from "./internals.js";
