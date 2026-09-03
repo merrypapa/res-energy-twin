@@ -101,6 +101,31 @@ export function portNetPower(
   return sum;
 }
 
+/**
+ * 이 노드가 스스로 내는 AC 전력(kW). AC 포트 전부의 순합이다.
+ *
+ * 트렁크에 데이지체인된 마이크로인버터에서는 ac_out 값이 그 지점 도체의 **누적** 전력이라
+ * 유닛 자체 출력과 다르다 (trunk_in으로 상류 몫이 들어와 함께 나간다).
+ * 둘을 구분하지 않으면 "10번 유닛이 14 A를 낸다"로 읽힌다 — 실제로는 1.4 A다.
+ */
+export function ownAcPower(
+  graph: RenderGraph,
+  ref: string,
+  ports: readonly { id: string; type: PortType }[],
+  flow: PowerFlowResult,
+): number | null {
+  let sum = 0;
+  let any = false;
+  for (const p of ports) {
+    if (portElectrical(p.type).domain !== "ac") continue;
+    const v = portNetPower(graph, ref, p.id, flow);
+    if (v === null) continue;
+    sum += v;
+    any = true;
+  }
+  return any ? sum : null;
+}
+
 const SQRT2 = Math.SQRT2;
 const PER_CYCLE = 48;
 const CYCLES = 2;
@@ -289,10 +314,28 @@ export function nodeSignals(
       }
       if (upstream > 0 && node.group !== null) {
         basis.push(`같은 배열에서 이 유닛보다 상류에 ${upstream}대가 있다 — 트렁크 전류가 그만큼 누적된 지점이다`);
-        formulas.push({
-          label: "트렁크 누적 전류",
-          expr: `I_트렁크 = Σ I_유닛 ≈ ${upstream + 1} × I_유닛 (모든 유닛이 같은 출력일 때)`,
-        });
+
+        // 이 포트의 값과 유닛 자체 출력을 갈라 준다. 같은 트렁크에서 유닛마다 값이
+        // 달라 보이는 것은 출력이 달라서가 아니라 여기가 누적 지점이기 때문이다.
+        const own = ownAcPower(graph, ref, node.device.ports, flow);
+        if (own !== null && v !== null && Math.abs(Math.abs(own) - Math.abs(pKw ?? 0)) > 1e-6) {
+          const ownI = (Math.abs(own) * 1000) / v;
+          basis.push(
+            `이 포트의 ${fmt(Math.abs(pKw ?? 0))} kW(${ownI > 0 ? fmt((Math.abs(pKw ?? 0) * 1000) / v) : "—"} A)는 ` +
+              `이 지점 도체의 누적값이다. 이 유닛 자체 출력은 ${fmt(Math.abs(own))} kW(${fmt(ownI)} A)다`,
+          );
+          formulas.push({
+            label: "트렁크 누적 전류",
+            expr:
+              `I_트렁크 = Σ I_유닛 = ${fmt((Math.abs(pKw ?? 0) * 1000) / v)} A ` +
+              `(상류 ${upstream}대 + 자기 1대, 유닛당 ${fmt(ownI)} A)`,
+          });
+        } else {
+          formulas.push({
+            label: "트렁크 누적 전류",
+            expr: `I_트렁크 = Σ I_유닛 ≈ ${upstream + 1} × I_유닛 (모든 유닛이 같은 출력일 때)`,
+          });
+        }
       }
     } else {
       // DC: 전류는 모듈 정격이 정한다. 전압은 직렬로 쌓인 결과다.

@@ -4,7 +4,7 @@ import { composeTopology } from "../src/config/compose.js";
 import { buildRenderGraph } from "../src/graph/index.js";
 import { evaluateScenario } from "../src/scenario/index.js";
 import { computePowerFlow } from "../src/analysis/powerflow.js";
-import { nodeSignals } from "../src/analysis/signals.js";
+import { nodeSignals, ownAcPower } from "../src/analysis/signals.js";
 import { checkNoteCoverage, notesFor } from "../src/analysis/notes.js";
 import { OperatingPoint } from "../src/analysis/operating-point.js";
 import { Device } from "../src/schema/device.js";
@@ -251,5 +251,46 @@ describe("인버터 클리핑", () => {
     const f = at("qcells-qhome", 1.0);
     expect(f.clipped_kw).toBe(0);
     expect(f.findings.some((x) => x.code === "P031")).toBe(true);
+  });
+});
+
+describe("트렁크 누적과 유닛 자체 출력", () => {
+  const qcells = () => {
+    const tpl = templates.find((t) => t.id === "qcells-qhome")!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, devices, ["power", "comms"]);
+    const op = OperatingPoint.parse({ irradiance: 0.8, house_load_kw: 2 });
+    return { g, op, flow: computePowerFlow(g, op, {}) };
+  };
+  const acOut = (ref: string) => {
+    const { g, op, flow } = qcells();
+    return nodeSignals(g, ref, flow, op).ports.find((p) => p.port_id === "ac_out")!;
+  };
+
+  it("트렁크 하류로 갈수록 도체 전력이 쌓인다", () => {
+    expect(acOut("mi-02").p_kw!).toBeCloseTo(2 * acOut("mi-01").p_kw!, 6);
+    expect(acOut("mi-10").p_kw!).toBeCloseTo(10 * acOut("mi-01").p_kw!, 6);
+  });
+
+  it("두 번째 스트링은 별도 트렁크라 다시 1대분에서 시작한다", () => {
+    expect(acOut("mi-11").p_kw!).toBeCloseTo(acOut("mi-01").p_kw!, 6);
+    expect(acOut("mi-12").p_kw!).toBeCloseTo(acOut("mi-02").p_kw!, 6);
+  });
+
+  it("유닛 자체 출력은 트렁크 위치와 무관하게 같다", () => {
+    const { g, flow } = qcells();
+    const own = (ref: string) => ownAcPower(g, ref, g.byRef.get(ref)!.device.ports, flow)!;
+    for (const ref of ["mi-01", "mi-02", "mi-10", "mi-11", "mi-20"]) {
+      expect(`${ref}:${own(ref).toFixed(3)}`).toBe(`${ref}:${own("mi-01").toFixed(3)}`);
+    }
+  });
+
+  it("누적 지점에서는 자체 출력을 함께 밝힌다 — 값이 다른 이유가 화면에 있어야 한다", () => {
+    const basis = acOut("mi-20").basis.join(" ");
+    expect(basis).toContain("누적값");
+    expect(basis).toContain("자체 출력");
+  });
+
+  it("트렁크 첫 유닛은 누적이 없으므로 그 설명을 붙이지 않는다", () => {
+    expect(acOut("mi-01").basis.join(" ")).not.toContain("누적값");
   });
 });
