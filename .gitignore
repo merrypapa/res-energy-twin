@@ -4,3 +4,4 @@ dist/
 out/
 src/ui/generated/
 dist/
+dist-artifact/

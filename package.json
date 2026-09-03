@@ -13,7 +13,8 @@
     "bundle": "tsx scripts/bundle.ts",
     "dev": "npm run bundle && vite",
     "build": "npm run bundle && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "artifact": "npm run build && tsx scripts/artifact.ts"
   },
   "keywords": [],
   "author": "",
