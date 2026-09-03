@@ -320,3 +320,40 @@ button, select, input { font: inherit; color: inherit; }
   .sheets[data-zoom="actual"] .sheet svg { width: 100%; height: auto; max-width: 100%; }
   .sheets[data-zoom="actual"] .sheet > .paper { overflow-x: auto; }
 }
+
+/* ── 구성 옵션: 드롭다운 (스프린트 7) ─────────────────── */
+.axis-select {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--rule-strong);
+  background: #fff;
+}
+
+/* ── 노드 패널: 위는 그래프, 아래는 설명 ───────────────── */
+.inspector .charts { padding-top: 12px; }
+.port-charts + .port-charts { margin-top: 12px; }
+.chart-caption { margin: 0 0 2px; font-size: 12px; color: var(--ink-soft); }
+
+/* ── 제품 스펙 ──────────────────────────────────────── */
+.products { border-top: 1px solid var(--rule-strong); }
+.products h2 { padding: 12px 14px 6px; }
+.product { padding: 0 14px 14px; }
+.product + .product { border-top: 1px solid var(--rule); padding-top: 12px; }
+.product h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.product .sub { font-size: 12px; color: var(--ink-soft); }
+.product > .sub { margin: 1px 0 6px; }
+.product .readout { margin-bottom: 6px; }
+.product .readout th { width: 116px; }
+.product .empty { padding: 2px 0; font-size: 12px; }
+.sources { margin-top: 6px; }
+.sources li { margin-top: 4px; }
+.sources a { color: var(--ink); text-underline-offset: 2px; }
+.note-text { display: block; color: var(--ink-soft); }
+
+.sheet-error {
+  padding: 16px;
+  border: 1px dashed var(--rule-strong);
+  background: var(--panel);
+}
+.sheet-error p { margin: 0 0 6px; }
+.sheet-error .mono { font-size: 11px; color: var(--ink-soft); word-break: break-all; }

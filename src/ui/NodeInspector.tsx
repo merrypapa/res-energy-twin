@@ -7,12 +7,14 @@ import { assumptionLines } from "../analysis/operating-point.js";
 import { notesFor } from "../analysis/notes.js";
 import { ELECTRICAL_SOURCE } from "../schema/electrical.js";
 import { IvChart, WaveformChart } from "./SignalChart.js";
+import { ProductCard } from "./ProductSheet.js";
 
 /**
- * 노드 포인트 패널 — 신호(계산)와 설계 노트(데이터)를 한 자리에 놓는다.
+ * 노드 포인트 패널 — 위는 그래프, 아래는 설명.
  *
  * 이 컴포넌트는 값을 만들지 않는다. 숫자는 전부 analysis/가 계산한 것이고,
- * 설명은 전부 node-notes/의 데이터다. 여기에 제품 지식을 적으면 안 된다.
+ * 설명은 전부 node-notes/의 데이터, 스펙은 device-library의 것이다.
+ * 여기에 제품 지식을 적으면 안 된다.
  */
 export function NodeInspector({
   graph,
@@ -33,6 +35,7 @@ export function NodeInspector({
   const applicable = notesFor(notes, node.device);
   const power = report.ports.filter((p) => p.domain !== "signal");
   const signal = report.ports.filter((p) => p.domain === "signal");
+  const charted = power.filter((p) => p.waveform !== null && Math.abs(p.p_kw ?? 0) > 0.0005);
 
   return (
     <section className="inspector">
@@ -48,6 +51,36 @@ export function NodeInspector({
         </button>
       </header>
 
+      {/* ── 그래프: 이 노드에서 무엇이 흐르는가 ───────────────── */}
+      <div className="group charts">
+        <h3>신호</h3>
+        {charted.length === 0 && report.iv === null && (
+          <p className="empty">
+            이 노드에는 지금 흐르는 전력이 없거나, 계산에 필요한 정격이 확인되지 않았다.
+            아래 설명에서 이유를 볼 수 있다.
+          </p>
+        )}
+        {charted.map((p) => (
+          <div className="port-charts" key={p.port_id}>
+            <p className="chart-caption">
+              <span className="mono">{p.port_id}</span> · {p.domain === "ac" ? "교류" : "직류"} ·{" "}
+              {p.p_kw! > 0 ? "공급" : "흡수"} {Math.abs(p.p_kw!).toFixed(2)} kW
+            </p>
+            <WaveformChart wave={p.waveform!} />
+          </div>
+        ))}
+        {report.iv && (
+          <div className="port-charts">
+            <p className="chart-caption">모듈 I–V · P–V</p>
+            <IvChart iv={report.iv} />
+          </div>
+        )}
+        {power.some((p) => p.domain === "dc" && p.p_kw !== null && p.waveform === null) && (
+          <p className="hint">직류 지점은 파형이 없다 — 값이 시간에 따라 변하지 않는다.</p>
+        )}
+      </div>
+
+      {/* ── 아래는 설명 ─────────────────────────────────────── */}
       <div className="group">
         <h3>동작점</h3>
         <ul className="plain">
@@ -65,13 +98,6 @@ export function NodeInspector({
       {power.map((p) => (
         <PortPanel key={p.port_id} port={p} />
       ))}
-
-      {report.iv && (
-        <div className="group">
-          <h3>모듈 I–V · P–V</h3>
-          <IvChart iv={report.iv} />
-        </div>
-      )}
 
       {signal.length > 0 && (
         <div className="group">
@@ -116,19 +142,10 @@ export function NodeInspector({
         ))}
       </div>
 
-      {(node.device.todos.length > 0 || report.findings.length > 0) && (
-        <div className="group">
-          <h3>이 장치의 미확인 항목</h3>
-          <ul className="plain">
-            {report.findings.map((f) => (
-              <li key={f.code + f.message}>{f.message}</li>
-            ))}
-            {node.device.todos.map((t) => (
-              <li key={t}>{t}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="group">
+        <h3>제품 스펙 · 데이터시트</h3>
+        <ProductCard device={node.device} />
+      </div>
 
       <p className="disclaimer">
         전압·주파수는 {ELECTRICAL_SOURCE.ref}의 공칭값이며 원문 대조 전이다. 계산은 임피던스·전압 강하·
@@ -174,11 +191,7 @@ function PortPanel({ port }: { port: PortSignal }) {
         </tbody>
       </table>
 
-      {port.peers.length > 0 && (
-        <p className="sub">도체 상대: {port.peers.join(", ")}</p>
-      )}
-
-      {port.waveform && flowing && <WaveformChart wave={port.waveform} />}
+      {port.peers.length > 0 && <p className="sub">도체 상대: {port.peers.join(", ")}</p>}
 
       {port.basis.length > 0 && (
         <ul className="plain basis">

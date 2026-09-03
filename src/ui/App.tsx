@@ -15,16 +15,23 @@ import { Configurator } from "./Configurator.js";
 import { FindingList } from "./FindingList.js";
 import { DiffTable } from "./DiffTable.js";
 import { NodeInspector } from "./NodeInspector.js";
+import { ProductSheets } from "./ProductSheet.js";
+import { specSheets } from "../analysis/spec.js";
 import { readState, writeState } from "./urlState.js";
 
 const ALL_LAYERS: Layer[] = ["power", "comms", "physical"];
+
+/** 처음 열었을 때는 벤더 구성을 보여준다. Customize(workbench)는 고르러 들어가는 곳이다. */
+function defaultTemplateId(): string {
+  return (CONFIGURATIONS.find((c) => c.role === "vendor") ?? CONFIGURATIONS[0])?.id ?? "";
+}
 const LAYER_LABEL: Record<Layer, string> = { power: "전력", comms: "통신", physical: "물리" };
 
 export default function App() {
   const initial = useMemo(
     () =>
       readState({
-        selected: [CONFIGURATIONS[0]?.id ?? ""],
+        selected: [defaultTemplateId()],
         layers: ["power", "comms"],
         scenarioId: null,
         trip: "",
@@ -37,9 +44,7 @@ export default function App() {
   );
   // 오래된 링크가 사라진 구성을 가리키면 조용히 빈 화면이 되지 않게 첫 구성으로 떨어진다.
   const known = initial.selected.filter((id) => CONFIGURATIONS.some((c) => c.id === id));
-  const [selected, setSelected] = useState<string[]>(
-    known.length > 0 ? known : [CONFIGURATIONS[0]?.id ?? ""],
-  );
+  const [selected, setSelected] = useState<string[]>(known.length > 0 ? known : [defaultTemplateId()]);
   const [layers, setLayers] = useState<Layer[]>(initial.layers);
   const [scenarioId, setScenarioId] = useState<string | null>(initial.scenarioId);
   const [trip, setTrip] = useState<string>(initial.trip);
@@ -70,30 +75,51 @@ export default function App() {
         for (const axis of tpl.options) if (options[axis.id] !== undefined) own[axis.id] = options[axis.id]!;
         const composed = composeTopology(tpl, own);
         const topology = composed.topology;
-        const open = trip ? [trip] : [];
-        const run = scenario ? evaluateScenario(topology, DEVICES, scenario, { open }) : null;
-        const graph = buildRenderGraph(topology, DEVICES, ALL_LAYERS);
-        const flow = computePowerFlow(graph, op, {
-          scenario: scenario ?? null,
-          energization: run?.energization ?? null,
-          site,
-        });
-        return {
+        const base = {
           template: tpl,
           topology,
           appliedOptions: composed.options,
           composeFindings: composed.findings,
-          run,
-          graph,
-          flow,
-          svg: renderTopology(topology, DEVICES, {
-            layers,
-            date: BUILT_AT,
-            selected: node?.topology === topology.id ? node.ref : null,
-            ...(run && scenario ? { energization: run.energization, scenario: scenario.id } : {}),
-          }),
-          rules: runRules(topology, DEVICES, site),
         };
+        try {
+          const open = trip ? [trip] : [];
+          const run = scenario ? evaluateScenario(topology, DEVICES, scenario, { open }) : null;
+          const graph = buildRenderGraph(topology, DEVICES, ALL_LAYERS);
+          const flow = computePowerFlow(graph, op, {
+            scenario: scenario ?? null,
+            energization: run?.energization ?? null,
+            site,
+          });
+          return {
+            ...base,
+            error: null as string | null,
+            run,
+            graph,
+            flow,
+            svg: renderTopology(topology, DEVICES, {
+              layers,
+              date: BUILT_AT,
+              selected: node?.topology === topology.id ? node.ref : null,
+              ...(run && scenario ? { energization: run.energization, scenario: scenario.id } : {}),
+            }),
+            rules: runRules(topology, DEVICES, site),
+          };
+        } catch (e) {
+          /**
+           * 고를 수 있는 조합 중에는 결선이 성립하지 않는 것도 있다 —
+           * 예를 들어 DC 축전지를 축전지 포트가 없는 인버터에 붙이면 포트가 없다.
+           * 그때 화면을 죽이지 않고, 무엇이 안 맞는지 그대로 보여준다.
+           */
+          return {
+            ...base,
+            error: e instanceof Error ? e.message : String(e),
+            run: null,
+            graph: null,
+            flow: null,
+            svg: "",
+            rules: { topology_id: topology.id, findings: [], unverified: [] },
+          };
+        }
       }),
     [templates, options, scenario, layers, site, trip, node, op],
   );
@@ -113,9 +139,20 @@ export default function App() {
   const inspected = useMemo(() => {
     if (!node) return null;
     const target = results.find((r) => r.topology.id === node.topology);
-    if (!target || !target.graph.byRef.has(node.ref)) return null;
-    return { target, report: nodeSignals(target.graph, node.ref, target.flow, op) };
+    if (!target || target.graph === null || target.flow === null) return null;
+    if (!target.graph.byRef.has(node.ref)) return null;
+    return {
+      graph: target.graph,
+      flow: target.flow,
+      report: nodeSignals(target.graph, node.ref, target.flow, op),
+    };
   }, [node, results, op]);
+
+  /** 지금 구성에 실제로 들어간 제품들 — 스펙과 데이터시트를 오른쪽에 띄운다. */
+  const products = useMemo(
+    () => specSheets(DEVICES, results.flatMap((r) => r.topology.nodes.map((n) => n.device))),
+    [results],
+  );
 
   // SVG는 문자열로 주입되므로 클릭은 컨테이너에서 위임으로 받는다.
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -242,8 +279,19 @@ export default function App() {
                 <figcaption>
                   {r.topology.vendor} · {r.topology.display_name}
                   {r.run && ` · 활선 ${liveCount(r.run.energization)}`}
+                  {r.error !== null && " · 결선 불성립"}
                 </figcaption>
-                <div className="paper" dangerouslySetInnerHTML={{ __html: r.svg }} />
+                {r.error === null ? (
+                  <div className="paper" dangerouslySetInnerHTML={{ __html: r.svg }} />
+                ) : (
+                  <div className="sheet-error">
+                    <p>이 조합은 결선이 성립하지 않아 도면을 그릴 수 없다.</p>
+                    <p className="mono">{r.error}</p>
+                    <p className="hint">
+                      선택을 바꾸거나, 오른쪽 검증 결과에서 어떤 포트가 맞지 않는지 확인해라.
+                    </p>
+                  </div>
+                )}
               </figure>
             ))}
           </div>
@@ -259,21 +307,37 @@ export default function App() {
         <aside className="pane right">
           {inspected ? (
             <NodeInspector
-              graph={inspected.target.graph}
+              graph={inspected.graph}
               report={inspected.report}
-              flow={inspected.target.flow}
+              flow={inspected.flow}
               op={op}
               notes={NOTES}
               onClose={() => setNode(null)}
             />
           ) : (
-            <FindingList
-              results={results}
-              dataFindings={[
-                ...DATA_FINDINGS.filter((f) => results.some((r) => f.where.includes(r.template.id))),
-                ...results.flatMap((r) => [...r.composeFindings, ...r.flow.findings]),
-              ]}
-            />
+            <>
+              <ProductSheets sheets={products} />
+              <FindingList
+                results={results}
+                dataFindings={[
+                  ...DATA_FINDINGS.filter((f) => results.some((r) => f.where.includes(r.template.id))),
+                  ...results.flatMap((r) => [
+                    ...r.composeFindings,
+                    ...(r.flow?.findings ?? []),
+                    ...(r.error === null
+                      ? []
+                      : [
+                          {
+                            severity: "error" as const,
+                            code: "U010",
+                            message: r.error,
+                            where: r.topology.id,
+                          },
+                        ]),
+                  ]),
+                ]}
+              />
+            </>
           )}
         </aside>
       </div>

@@ -99,20 +99,19 @@ export function Configurator({
               )}
             </span>
             {axis.kind === "enum" ? (
-              <div className="toggle-row">
+              // 선택지가 제품 목록까지 늘어난 뒤로 버튼 나열은 왼쪽 열을 다 먹는다.
+              // 드롭다운이면 축 하나가 한 줄이고, 고른 값이 늘 보인다.
+              <select
+                className="axis-select"
+                value={String(valueOf(axis))}
+                onChange={(e) => set(axis.id, e.target.value)}
+              >
                 {axis.choices.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    className="toggle"
-                    data-on={String(valueOf(axis)) === c.value}
-                    title={c.note ?? undefined}
-                    onClick={() => set(axis.id, c.value)}
-                  >
+                  <option key={c.value} value={c.value}>
                     {c.label}
-                  </button>
+                  </option>
                 ))}
-              </div>
+              </select>
             ) : (
               <label className="field inline">
                 <input
