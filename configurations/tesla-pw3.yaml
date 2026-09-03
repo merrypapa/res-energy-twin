@@ -29,6 +29,17 @@ options:
       - value: gateway_3
         label: Gateway 3 (별치 함체)
         note: "별치 함체. needs_backup_subpanel=conditional — 부분 백업 구성에 쓰인다"
+  - id: pv_module_device
+    label: PV 모듈
+    kind: enum
+    default: generic-pv-module-400w
+    choices:
+      - value: generic-pv-module-400w
+        label: PV 모듈 400W (모델링 기준)
+        note: "Tesla는 모듈을 만들지 않는다. 전기 정격이 들어 있어 DC 신호가 계산된다"
+      - value: qcells-qtron-blk-m-g2
+        label: Qcells Q.TRON BLK M-G2+ 440
+        note: "실제 제품. STC 전기 정격이 미입력이라 DC 전압·전류는 계산되지 않는다"
   - id: pv_modules
     label: PV 모듈 수
     kind: int
@@ -71,6 +82,7 @@ nodes:
   - { ref: pw3, device: tesla-powerwall-3, label: Powerwall 3, count_from: battery_units }
   - ref: pv
     device: generic-pv-module-400w
+    device_from: pv_module_device
     label: PV
     repeat: { count: pv_modules, chunk: string_size }
 
@@ -152,10 +164,12 @@ edges:
 presets:
   - id: tesla-pw3-backup-switch-whole-home
     display_name: "Powerwall 3 + Backup Switch — 전체 백업"
-    options: { backup_mode: whole_home, mid_device: backup_switch, pv_modules: 20, string_size: 10, battery_units: 1 }
+    options: { backup_mode: whole_home, mid_device: backup_switch, pv_modules: 20, string_size: 10,
+               battery_units: 1, pv_module_device: generic-pv-module-400w }
   - id: tesla-pw3-gateway3-partial
     display_name: "Powerwall 3 + Gateway 3 — 부분 백업"
-    options: { backup_mode: partial, mid_device: gateway_3, pv_modules: 20, string_size: 10, battery_units: 1 }
+    options: { backup_mode: partial, mid_device: gateway_3, pv_modules: 20, string_size: 10,
+               battery_units: 1, pv_module_device: generic-pv-module-400w }
     note: "Gateway 3의 needs_backup_subpanel=conditional에서 도출한 골격. 실제 결선 대조 전이다"
 
 sources:
@@ -165,5 +179,5 @@ sources:
 todos:
   - "PW3 병렬 시 스트링 배분과 통신(리더 유닛) 구성 확인 — 현재 첫 유닛만 MID에 연결한다"
   - "Backup Switch의 CT 배선을 comms 레이어로 둘지 ct_sense 포트로 분리할지 결정"
-  - "string_size 기본 10은 자리값이다. MPPT 입력 전압 창과 저온 Voc를 확인해 정할 것"
+  - "string_size 기본 10은 자리값이다. PW3의 MPPT 창은 60–480 V DC이므로 저온 Voc까지 넣어 상한을 정할 것"
   - "backup_mode=none이 E025로 떨어지는 것이 맞는지 확인 (게이트웨이 없이 grid support 설치가 가능한가)"

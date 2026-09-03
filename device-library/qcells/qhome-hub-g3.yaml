@@ -1,0 +1,25 @@
+id: qcells-qhome-hub-g3
+vendor: Qcells
+display_name: Q.HOME HUB G3 (백업 유닛)
+class: mid
+status: draft
+ratings:
+  service_a: null           # TODO: 지원 서비스 정격 확인
+ports:
+  - { id: grid_in, type: ac_service_line, direction: in, mid_side: grid }
+  - { id: load_out, type: ac_service_line, direction: out, mid_side: load }
+  - { id: comms, type: comms_proprietary, direction: bidirectional, max_connections: 4 }
+provides_mid: true
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Qcells Q.HOME CORE G3 / Q.HOME 시스템 구성 문서"
+    url: "https://us.qcells.com/qhome-core/technical-documents/"
+    date: "2026-09-03"
+    note: >-
+      백업 구성은 AC 모듈 + AC 결합반 + 축전지 + 백업 유닛(HUB)으로 이뤄지며,
+      HUB G3와 함께 설치하면 오프그리드 운전과 AC 모듈 협조 제어를 지원한다
+todos:
+  - "서비스 정격·전환 방식·포트 구성을 설치 매뉴얼에서 확인할 것"

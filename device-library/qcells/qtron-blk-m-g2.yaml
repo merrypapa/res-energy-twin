@@ -1,0 +1,34 @@
+id: qcells-qtron-blk-m-g2
+vendor: Qcells
+display_name: Q.TRON BLK M-G2+ 440 (DC 모듈)
+class: pv_module
+status: draft
+ratings:
+  pv_stc_w: 440
+  module_efficiency_pct: 22.5
+  pv_temp_coeff_pmax_pct_per_c: -0.3
+  pv_temp_coeff_voc_pct_per_c: -0.24
+  # 아래 네 값은 데이터시트 표(STC)에 있으나 이 환경에서 PDF를 열 수 없어 채우지 않았다.
+  # 추정치를 넣지 않는다 — 값이 없으면 신호 엔진이 DC 전압·전류를 계산하지 않고 그 사실을 알린다.
+  pv_vmp_v: null
+  pv_imp_a: null
+  pv_voc_v: null
+  pv_isc_a: null
+ports:
+  - { id: dc_in, type: dc_pv_module, direction: in }
+  - { id: dc_out, type: dc_pv_module, direction: out }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Qcells Q.TRON BLK M-G2+ 415–440 데이터시트 (북미, Rev04 2024-08)"
+    url: "https://us.qcells.com/wp-content/uploads/2024/08/Qcells_Data_sheet_Q.TRON_BLK_M-G2_series_415-440_2024-08_Rev04_NA.pdf"
+    date: "2026-09-03"
+    note: >-
+      108셀 N형 TOPCon(Q.ANTUM NEO), 모듈 효율 최대 22.5%, 415–440 Wp,
+      1722 × 1134 × 30 mm / 21.2 kg, 온도계수 PMax −0.3%/°C · Voc −0.24%/°C.
+      Vmp/Imp/Voc/Isc는 PDF 원문 열람이 차단되어 확인하지 못했다
+todos:
+  - "데이터시트 원문에서 STC 전기 정격(Vmp/Imp/Voc/Isc)을 채울 것 — 채우기 전까지 이 모듈의 DC 신호는 계산되지 않는다"

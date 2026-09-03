@@ -1,0 +1,23 @@
+id: generic-ac-combiner
+vendor: generic
+display_name: AC 결합반 (모델링 기준)
+class: combiner
+status: verified          # 특정 제품이 아니라 "모델링 기준값"이라는 뜻이다
+ratings:
+  busbar_a: 100
+ports:
+  - { id: pv_ac_in, type: ac_240v_split, direction: in, max_connections: 6 }
+  - { id: battery_ac, type: ac_240v_split, direction: bidirectional, max_connections: 4 }
+  - { id: main_ac, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional, max_connections: 8 }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "모델링 기준값 (특정 제품 아님)"
+    date: null
+    note: "벤더를 섞어 구성할 때 쓰는 중립 결합반. 회로 수와 모선 정격은 가정값이다"
+todos:
+  - "실제 제품으로 교체 시 회로 수·모선 정격·차단기 구성을 함께 채울 것"

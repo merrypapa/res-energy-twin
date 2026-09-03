@@ -1,0 +1,241 @@
+id: custom
+vendor: Customize
+display_name: Customize — 모듈 · 인버터 · ESS를 직접 고른다
+status: draft
+role: workbench
+
+# 벤더 템플릿이 "그 회사의 대표 구성"이라면 이쪽은 조합 실험용이다.
+# 결합 방식(AC 모듈 / 마이크로인버터 / DC 스트링)을 고르면 결선 구조가 바뀌고,
+# 각 자리의 제품은 device-library에 있는 것 중에서 고른다.
+# 성립하지 않는 조합(예: 축전지 DC 포트가 없는 인버터에 DC 축전지)도 고를 수 있다 —
+# 그 판정을 보여주는 것이 이 도구의 목적이다.
+options:
+  - id: coupling
+    label: 결합 방식
+    kind: enum
+    default: micro
+    choices:
+      - value: ac_module
+        label: AC 모듈 (변환기 일체형)
+        note: "모듈이 각자 AC를 낸다. 어레이에 DC 구간이 없다"
+      - value: micro
+        label: 모듈 + 마이크로인버터
+        note: "모듈 1장에 인버터 1대. 모듈 단위 MPPT"
+      - value: dc_string
+        label: DC 스트링 (하이브리드 인버터)
+        note: "모듈이 직렬로 이어져 인버터 MPPT로 들어간다"
+  - id: backup_mode
+    label: 백업 구성
+    kind: enum
+    default: whole_home
+    choices:
+      - { value: "none", label: "Grid support (백업 없음)" }
+      - { value: partial, label: "부분 백업" }
+      - { value: whole_home, label: "전체 백업" }
+  - id: mid_device
+    label: 계통 분리 장치
+    kind: enum
+    default: generic-mid-placeholder
+    choices:
+      - { value: generic-mid-placeholder, label: "MID (제품 미확정)" }
+      - { value: enphase-iq-meter-collar, label: "Enphase IQ Meter Collar" }
+      - { value: tesla-backup-switch, label: "Tesla Backup Switch" }
+      - { value: tesla-gateway-3, label: "Tesla Gateway 3" }
+      - { value: solaredge-backup-interface, label: "SolarEdge Backup Interface" }
+      - { value: qcells-qhome-hub-g3, label: "Qcells Q.HOME HUB G3" }
+  - id: pv_module_device
+    label: PV 모듈 (DC)
+    kind: enum
+    default: generic-pv-module-400w
+    choices:
+      - { value: generic-pv-module-400w, label: "PV 모듈 400W (모델링 기준)", note: "전기 정격이 들어 있어 DC 신호가 계산된다" }
+      - { value: qcells-qtron-blk-m-g2, label: "Qcells Q.TRON BLK M-G2+ 440", note: "STC 전기 정격 미입력 — DC 전압·전류는 계산되지 않는다" }
+  - id: ac_module_device
+    label: AC 모듈
+    kind: enum
+    default: qcells-qtron-blk-m-g2-ac
+    choices:
+      - { value: qcells-qtron-blk-m-g2-ac, label: "Qcells Q.TRON BLK M-G2+/AC 440" }
+  - id: micro_device
+    label: 마이크로인버터
+    kind: enum
+    default: enphase-iq8m
+    choices:
+      - { value: enphase-iq8plus, label: "Enphase IQ8+ (290 VA)" }
+      - { value: enphase-iq8m, label: "Enphase IQ8M (325 VA)" }
+      - { value: enphase-iq8a, label: "Enphase IQ8A (349 VA)" }
+  - id: inverter_device
+    label: 스트링/하이브리드 인버터
+    kind: enum
+    default: solaredge-home-hub-se7600h
+    choices:
+      - { value: solaredge-home-hub-se7600h, label: "SolarEdge Home Hub SE7600H (7.6 kW)", note: "DC 축전지 포트가 있다" }
+      - { value: tesla-powerwall-3, label: "Tesla Powerwall 3 (11.5 kW, 축전지 내장)", note: "축전지가 내장이라 별도 ESS를 붙이면 판정이 걸린다" }
+  - id: combiner_device
+    label: AC 결합반
+    kind: enum
+    default: generic-ac-combiner
+    choices:
+      - { value: generic-ac-combiner, label: "AC 결합반 (모델링 기준)" }
+      - { value: enphase-iq-combiner-6c, label: "Enphase IQ Combiner 6C" }
+      - { value: qcells-qhome-combiner-80-g1, label: "Qcells Q.HOME COMBINER 80 G1" }
+  - id: battery_type
+    label: ESS 결합
+    kind: enum
+    default: ac
+    choices:
+      - { value: "none", label: "ESS 없음" }
+      - { value: ac, label: "AC 결합 ESS" }
+      - { value: dc, label: "DC 결합 ESS", note: "인버터에 DC 축전지 포트가 있어야 성립한다" }
+  - id: ac_battery_device
+    label: AC 결합 ESS
+    kind: enum
+    default: enphase-iq-battery-5p
+    choices:
+      - { value: enphase-iq-battery-5p, label: "Enphase IQ Battery 5P (5.0 kWh · 3.84 kVA)" }
+      - { value: enphase-iq-battery-10c, label: "Enphase IQ Battery 10C (10 kWh · 7.08 kVA)" }
+      - { value: qcells-qhome-core-g3, label: "Qcells Q.HOME CORE G3 (13.1 kWh · 7.6 kW)" }
+  - id: dc_battery_device
+    label: DC 결합 ESS
+    kind: enum
+    default: solaredge-home-battery-400v
+    choices:
+      - { value: solaredge-home-battery-400v, label: "SolarEdge Home Battery 400V (9.7 kWh)" }
+  - id: pv_modules
+    label: 모듈 수
+    kind: int
+    min: 1
+    max: 44
+    default: 20
+    unit: "장"
+  - id: string_size
+    label: 스트링/분기당 모듈
+    kind: int
+    min: 1
+    max: 22
+    default: 10
+    unit: "장"
+  - id: battery_units
+    label: ESS 대수
+    kind: int
+    min: 0
+    max: 4
+    default: 1
+    unit: "대"
+
+nodes:
+  - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
+  - ref: mid
+    device: generic-mid-placeholder
+    device_from: mid_device
+    when: { backup_mode: [partial, whole_home] }
+  - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
+  - ref: sub
+    device: generic-backup-subpanel-100a
+    label: 백업 서브패널
+    when: { backup_mode: [partial] }
+  - ref: comb
+    device: generic-ac-combiner
+    device_from: combiner_device
+    when: { coupling: [ac_module, micro] }
+  - ref: inv
+    device: solaredge-home-hub-se7600h
+    device_from: inverter_device
+    when: { coupling: [dc_string] }
+  - ref: battac
+    device: enphase-iq-battery-5p
+    device_from: ac_battery_device
+    label: AC ESS
+    count_from: battery_units
+    when: { battery_type: [ac] }
+  - ref: battdc
+    device: solaredge-home-battery-400v
+    device_from: dc_battery_device
+    label: DC ESS
+    count_from: battery_units
+    when: { battery_type: [dc] }
+  - ref: pv
+    device: generic-pv-module-400w
+    device_from: pv_module_device
+    label: PV
+    repeat: { count: pv_modules, chunk: string_size }
+    when: { coupling: [micro, dc_string] }
+  - ref: acm
+    device: qcells-qtron-blk-m-g2-ac
+    device_from: ac_module_device
+    label: AC 모듈
+    repeat: { count: pv_modules, chunk: string_size }
+    when: { coupling: [ac_module] }
+  - ref: mi
+    device: enphase-iq8m
+    device_from: micro_device
+    label: 마이크로인버터
+    repeat: { count: pv_modules, chunk: string_size }
+    when: { coupling: [micro] }
+
+edges:
+  # ── 계통 인입 ────────────────────────────────────────────
+  - { from: svc.line, to: mid.grid_in, when: { backup_mode: [whole_home] }, conductor: { ocpd_a: 200 } }
+  - { from: mid.load_out, to: msp.main_lugs, when: { backup_mode: [whole_home] }, conductor: { ocpd_a: 200 } }
+  - { from: svc.line, to: msp.main_lugs, when: { backup_mode: ["none", partial] }, conductor: { ocpd_a: 200 } }
+  - { from: msp.branch, to: mid.grid_in, when: { backup_mode: [partial] }, conductor: { ocpd_a: null } }
+  - { from: mid.load_out, to: sub.feed, when: { backup_mode: [partial] }, conductor: { ocpd_a: null } }
+
+  # ── AC 모듈 ─────────────────────────────────────────────
+  - { from: acm.ac_out, to: acm.trunk_in, fanout: chain, when: { coupling: [ac_module] },
+      conductor: { note: "AC 트렁크 — 전류가 누적된다" } }
+  - { from: acm.ac_out, to: comb.pv_ac_in, fanout: chunk_last, when: { coupling: [ac_module] } }
+
+  # ── 모듈 + 마이크로인버터 ────────────────────────────────
+  - { from: pv.dc_out, to: mi.dc_in, fanout: pairwise, when: { coupling: [micro] } }
+  - { from: mi.ac_out, to: mi.trunk_in, fanout: chain, when: { coupling: [micro] },
+      conductor: { note: "AC 트렁크 — 전류가 누적된다" } }
+  - { from: mi.ac_out, to: comb.pv_ac_in, fanout: chunk_last, when: { coupling: [micro] } }
+
+  # ── DC 스트링 ───────────────────────────────────────────
+  - { from: pv.dc_out, to: pv.dc_in, fanout: chain, when: { coupling: [dc_string] },
+      conductor: { note: "직렬 — 전압이 더해진다" } }
+  - { from: pv.dc_out, to: inv.pv_dc, fanout: chunk_last, when: { coupling: [dc_string] } }
+  - { from: battdc.dc_out, to: inv.battery_dc, fanout: each,
+      when: { coupling: [dc_string], battery_type: [dc] } }
+
+  # ── 결합반 · 인버터 출력 ────────────────────────────────
+  - { from: comb.main_ac, to: msp.branch, when: { coupling: [ac_module, micro], backup_mode: ["none", whole_home] },
+      conductor: { ocpd_a: null, note: "부하측 인터커넥션" } }
+  - { from: comb.main_ac, to: sub.branch, when: { coupling: [ac_module, micro], backup_mode: [partial] },
+      conductor: { ocpd_a: null } }
+  - { from: inv.ac_out, to: msp.branch, fanout: each, when: { coupling: [dc_string], backup_mode: ["none", whole_home] },
+      conductor: { ocpd_a: null } }
+  - { from: inv.ac_out, to: sub.branch, fanout: each, when: { coupling: [dc_string], backup_mode: [partial] },
+      conductor: { ocpd_a: null } }
+
+  # ── AC 결합 ESS ─────────────────────────────────────────
+  - { from: battac.ac_out, to: comb.battery_ac, fanout: each,
+      when: { coupling: [ac_module, micro], battery_type: [ac] } }
+  - { from: battac.ac_out, to: msp.branch, fanout: each,
+      when: { coupling: [dc_string], battery_type: [ac], backup_mode: ["none", whole_home] } }
+  - { from: battac.ac_out, to: sub.branch, fanout: each,
+      when: { coupling: [dc_string], battery_type: [ac], backup_mode: [partial] } }
+
+  # ── 통신 ────────────────────────────────────────────────
+  - { from: battac.comms, to: comb.comms, layer: comms, fanout: each,
+      when: { coupling: [ac_module, micro], battery_type: [ac] } }
+  - { from: mid.comms, to: comb.comms, layer: comms,
+      when: { coupling: [ac_module, micro], backup_mode: [partial, whole_home] } }
+  - { from: inv.comms, to: mid.comms, layer: comms, fanout: first,
+      when: { coupling: [dc_string], backup_mode: [partial, whole_home] } }
+
+presets:
+  - id: custom-micro-ac-ess-whole-home
+    display_name: "Customize — 마이크로인버터 + AC 결합 ESS, 전체 백업"
+    options: { coupling: micro, backup_mode: whole_home, battery_type: ac, pv_modules: 20,
+               string_size: 10, battery_units: 1 }
+    note: "제품을 섞어 보기 위한 기본 조합. 벤더 조합의 성립 여부는 룰이 판정한다"
+
+sources:
+  - ref: "device-library의 제품 데이터를 조합만 한다 — 이 파일 자체에는 제품 정보가 없다"
+    date: "2026-09-03"
+    note: null
+todos:
+  - "벤더 혼합 조합의 통신·제어 호환성은 이 도구가 판정하지 않는다. 전기적 결선만 본다"
+  - "DC 결합 ESS는 인버터에 battery_dc 포트가 있어야 한다 — 없는 인버터를 고르면 E022가 뜬다"

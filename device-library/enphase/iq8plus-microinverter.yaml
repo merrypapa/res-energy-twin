@@ -1,0 +1,31 @@
+id: enphase-iq8plus
+vendor: Enphase
+display_name: IQ8+ 마이크로인버터
+class: microinverter
+status: draft
+ratings:
+  continuous_ac_kva: 0.29
+  peak_ac_kw: 0.3
+  cec_efficiency_pct: null
+ports:
+  # AC 트렁크를 노드 사이 결선으로 표현한다 (모델링 목적 — 실제 커넥터는 1쌍이다)
+  - { id: dc_in, type: dc_pv_module, direction: in }
+  - { id: trunk_in, type: ac_240v_split, direction: in }
+  - { id: ac_out, type: ac_240v_split, direction: out }
+provides_mid: false
+grid_forming: null          # TODO: IQ8 계열의 아일랜드 형성(Sunlight Backup 등) 조건 확인
+black_start_capable: null
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Enphase IQ8 Series Microinverters 데이터시트 (IQ8PLUS-72-2-US)"
+    url: "https://enphase.com/download/iq8-series-microinverters-data-sheet"
+    date: "2026-09-03"
+    note: >-
+      연속 출력 290 VA · 피크 300 VA. 공식 데이터시트 페이지의 표기 값이며,
+      이 환경에서 PDF 원문 열람이 차단되어 검색 결과에 노출된 표기로 확인했다. 원문 대조 필요
+todos:
+  - "MPPT 전압 창·최대 DC 입력·분기회로당 최대 유닛 수를 데이터시트 원문에서 확인할 것"
+  - "grid_forming 확인 전까지 엔진은 이 장치를 아일랜드 형성 주체로 쓰지 않는다"

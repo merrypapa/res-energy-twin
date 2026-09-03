@@ -13,12 +13,13 @@ ports:
 provides_mid: false
 grid_forming: true          # Meter Collar 개방 후 아일랜드를 세우는 주체
 black_start_capable: null   # TODO: 무잔량 기동 가능 여부 확인
-requires_one_of: [enphase-iq-meter-collar]
+requires_one_of: [enphase-iq-meter-collar, generic-mid-placeholder]
 needs_backup_subpanel: "no"
 certifications: []
 utility_approval: null
 sources:
   - ref: "Enphase 제품 페이지 / IQ Battery 10C 지원 문서"
+    url: "https://enphase.com/store/storage"
     date: "2026-08"
     note: "부분/전체 백업 모두 IQ Meter Collar 필요"
 todos:

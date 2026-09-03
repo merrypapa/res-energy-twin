@@ -18,8 +18,9 @@ utility_approval:
   status: unknown
   note: "미터 소켓 뒤 설치. 유틸리티별 요건 확인 필요"
 sources:
-  - ref: "Tesla Backup Switch 제품 페이지 / 설치 매뉴얼"
-    date: null
-    note: "원문 대조 필요"
+  - ref: "Tesla Powerwall 3 설치 매뉴얼 — Backup Switch 편 (Energy Library)"
+    url: "https://energylibrary.tesla.com/docs/Public/EnergyStorage/Powerwall/3/InstallManual/BackupSwitch/en-us/GUID-EC527BC7-4750-4425-BBC4-DB8C000339B3.html"
+    date: "2026-09-03"
+    note: "문서 위치만 확인했다. 지원 서비스 정격은 원문 열람이 차단되어 채우지 못했다"
 todos:
   - "정격 전류, 지원 서비스 유형(100/150/200A) 확인"

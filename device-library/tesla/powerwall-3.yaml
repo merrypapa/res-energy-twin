@@ -8,7 +8,9 @@ ratings:
   continuous_ac_kw: 11.5
   lra: 185
   pv_mppt_count: 6
-  max_pv_dc_kw: null   # TODO: 데이터시트 rev 확인
+  max_pv_dc_kw: 20     # 최대 solar STC 입력
+  mppt_v_min: 60
+  mppt_v_max: 480
 ports:
   - { id: pv_dc, type: dc_string, direction: in, max_connections: 6 }
   - { id: ac_out, type: ac_240v_split, direction: bidirectional, ocpd_a: 60 }
@@ -22,11 +24,14 @@ needs_backup_subpanel: conditional
 certifications: [UL9540, UL1741-SB]
 utility_approval: null
 sources:
-  - ref: "Tesla Powerwall 3 datasheet / installation manual"
-    date: null
-    note: "rev 및 취득일 미기재 — 사내 배포 전 원문 대조 필요"
+  - ref: "Tesla Powerwall 3 Datasheet (Energy Library)"
+    url: "https://energylibrary.tesla.com/docs/Public/EnergyStorage/Powerwall/3/Datasheet/en-us/Powerwall-3-Datasheet.pdf"
+    date: "2026-09-03"
+    note: >-
+      13.5 kWh · 연속 11.5 kW AC · 185 A LRA · 최대 solar STC 입력 20 kW ·
+      MPPT 6개, MPPT 입력 전압 창 60–480 V DC(MPPT당 최대 15 A).
+      PDF 원문 열람이 이 환경에서 차단되어 데이터시트 표기로 확인했다 — 원문 대조 필요
 todos:
   - "ac_out ocpd_a 60A는 11.5kW/240V 연속전류 기준 산출값. 매뉴얼 명시값과 대조 필요"
-  - "max_pv_dc_kw 확인"
   - "comms_local 실제 매체(유선 RS485/무선) 확인 — 현재 proprietary로 임시 분류"
   - "grid_forming=true는 whole_home 백업 구성에서 유일한 AC 소스라는 데이터로부터 도출. 매뉴얼 문구로 재확인 필요"

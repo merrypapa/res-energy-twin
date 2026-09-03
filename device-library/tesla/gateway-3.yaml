@@ -5,14 +5,19 @@ class: mid
 status: draft
 ratings: {}
 ports:
-  - { id: grid_in, type: ac_service_line, direction: in }
-  - { id: load_out, type: ac_service_line, direction: out }
+  - { id: grid_in, type: ac_service_line, direction: in, mid_side: grid }
+  - { id: load_out, type: ac_service_line, direction: out, mid_side: load }
   - { id: comms, type: comms_proprietary, direction: bidirectional }
 provides_mid: true
 requires_one_of: []
 needs_backup_subpanel: conditional
 certifications: []
 utility_approval: null
-sources: []
+sources:
+  - ref: "Tesla Gateway 3 Datasheet (Energy Library)"
+    url: "https://energylibrary.tesla.com/docs/Public/EnergyStorage/Powerwall/General/Datasheet/Gateway/3/en-us/Gateway-3-Datasheet.pdf"
+    date: "2026-09-03"
+    note: "데이터시트 존재만 확인했다. 정격 수치는 PDF 원문 열람이 차단되어 채우지 못했다"
 todos:
-  - "스텁 파일. 정격/포트 구성 전면 확인 필요"
+  - "서비스 정격·포트 구성을 데이터시트 원문에서 확인할 것 (현재 전 수치 null)"
+  - "mid_side 표기는 grid_in/load_out 이름에서 도출한 구조 가정이다"

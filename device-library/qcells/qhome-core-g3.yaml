@@ -1,0 +1,31 @@
+id: qcells-qhome-core-g3
+vendor: Qcells
+display_name: Q.HOME CORE G3 (A7.6B13.1)
+class: ac_battery
+status: draft
+ratings:
+  usable_energy_kwh: 13.1
+  continuous_ac_kw: 7.6            # 백업 출력
+  lra: null                        # TODO
+ports:
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: false
+grid_forming: true                 # HUB G3와 함께 오프그리드 운전을 이룬다
+black_start_capable: null
+requires_one_of: [qcells-qhome-hub-g3]
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Qcells Q.HOME CORE G3 제품 페이지 / 브로슈어"
+    url: "https://us.qcells.com/qhome-core-g3/"
+    date: "2026-09-03"
+    note: >-
+      AC 결합 ESS. 13.1 kWh에서 시작해 Q.HOME HUB G3 + CORE G3 2대 구성 시 26.24 kWh까지.
+      백업 출력 7.6 kW, LG에너지솔루션 LFP 셀, 15년 보증.
+      모델명 A7.6B13.1의 A/B가 각각 AC 출력(kW)과 축전 용량(kWh)을 가리킨다
+todos:
+  - "LRA(모터 기동) 정격 확인"
+  - "grid_forming=true는 HUB G3 조합의 오프그리드 운전 표기에서 도출했다. 매뉴얼 문구로 재확인 필요"
+  - "2대 병렬 시 연속 출력이 합산되는지 확인 (26.24 kWh는 용량 기준 표기다)"

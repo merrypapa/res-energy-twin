@@ -1,0 +1,28 @@
+id: qcells-qhome-combiner-80-g1
+vendor: Qcells
+display_name: Q.HOME COMBINER 80 G1
+class: combiner
+status: draft
+ratings:
+  busbar_a: null            # TODO: 모선 정격 확인 (제품명의 80이 무엇을 가리키는지 포함)
+ports:
+  # PV 스트링(=AC 모듈 분기회로) 최대 4회로
+  - { id: pv_ac_in, type: ac_240v_split, direction: in, max_connections: 4 }
+  - { id: battery_ac, type: ac_240v_split, direction: bidirectional, max_connections: 4 }
+  - { id: main_ac, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional, max_connections: 8 }
+provides_mid: false
+requires_one_of: []
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "Q.HOME COMBINER 80 G1 설치 매뉴얼"
+    url: "https://media.qcells.com/v/J5bKzFB8/"
+    date: "2026-09-03"
+    note: >-
+      PV 회로 최대 4계통, AC 모듈 최대 44장을 한 함체로 모은다.
+      소비 계량용 200 A 클램프형 CT 1쌍(정확도 ±0.5%) 지원
+todos:
+  - "모선·차단기 정격 확인. 제품명의 80이 정격 전류인지 확인"
+  - "CT는 계측 신호다 — ct_sense 포트로 분리할지 결정"

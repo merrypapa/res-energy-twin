@@ -1,0 +1,42 @@
+id: solaredge-home-hub-se7600h
+vendor: SolarEdge
+display_name: SolarEdge Home Hub Inverter SE7600H-US
+# 축전지가 함체 안에 있지 않다 — Home Battery 400V가 별도 노드로 DC측에 붙는다.
+# 그래서 hybrid_inverter_battery(일체형)가 아니라 string_inverter로 분류한다:
+# 이 구분이 "축전지 없이 야간 아일랜드가 성립하는가"의 판정을 가른다.
+class: string_inverter
+status: draft
+ratings:
+  continuous_ac_kw: 7.6            # 정격 AC 출력 7600 W
+  max_continuous_ac_a: 32          # 240 Vac 기준
+  usable_energy_kwh: null          # 축전지는 별도 노드(Home Battery 400V)에 있다 — 여기에 적지 않는다
+  lra: null                        # TODO: 백업 시 모터 기동 정격 확인
+  max_pv_dc_kw: null               # TODO
+  pv_mppt_count: null              # TODO
+  cec_efficiency_pct: null         # TODO
+ports:
+  - { id: pv_dc, type: dc_string, direction: in }
+  # 축전지 포트 2개(포트당 최대 40 A). 충·방전 합계 최대 12,500 W
+  - { id: battery_dc, type: dc_string, direction: bidirectional, max_connections: 2 }
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: false
+grid_forming: true          # Backup Interface와 함께 백업 구성을 이룬다
+black_start_capable: null
+requires_one_of: [solaredge-backup-interface]
+needs_backup_subpanel: conditional
+certifications: []
+utility_approval: null
+sources:
+  - ref: "SolarEdge Home Hub Inverter 데이터시트 (북미)"
+    url: "https://knowledge-center.solaredge.com/sites/kc/files/se-solaredge-home-hub-inverter-datasheet-nam.pdf"
+    date: "2026-09-03"
+    note: >-
+      SE7600H-US 정격 AC 7600 W · 공칭 240 Vac · 최대 연속 출력 전류 32 A · 59.3–60.5 Hz.
+      축전지는 인버터당 최대 3대, 포트 2개, 충·방전 최대 연속 12,500 W, 포트당 최대 40 A.
+      PDF 원문 열람이 이 환경에서 차단되어 데이터시트 표기로 확인했다 — 원문 대조 필요
+todos:
+  - "제품 표기는 하이브리드/스토리지 인버터다. 이 도구의 class는 '축전지 내장 여부'로 갈리므로 string_inverter로 뒀다"
+  - "최대 DC 입력·MPPT 수·CEC 효율을 데이터시트 원문에서 확인할 것"
+  - "Power Optimizer(모듈 단위 DC-DC)를 노드로 모델링하지 않았다 — 스트링 전압이 최적화기 출력으로 정해지므로 현재 DC 신호는 모듈 직렬 합 근사다"
+  - "grid_forming=true는 백업 구성이 성립한다는 사실에서 도출했다. 매뉴얼 문구로 재확인 필요"

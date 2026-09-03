@@ -1,0 +1,26 @@
+id: solaredge-home-battery-400v
+vendor: SolarEdge
+display_name: SolarEdge Home Battery 400V (BAT-10K1P)
+class: dc_battery
+status: draft
+ratings:
+  usable_energy_kwh: 9.7
+  continuous_ac_kw: null    # DC 축전지다 — 출력 한계는 인버터가 정한다(포트당 40 A, 합계 12.5 kW)
+ports:
+  - { id: dc_out, type: dc_string, direction: bidirectional }
+provides_mid: false
+grid_forming: false         # 변환기가 없다. 아일랜드는 인버터가 세운다
+black_start_capable: null
+requires_one_of: [solaredge-home-hub-se7600h]
+needs_backup_subpanel: "no"
+certifications: []
+utility_approval: null
+sources:
+  - ref: "SolarEdge Home Battery 400V 데이터시트 (북미, BAT-10K1P)"
+    url: "https://knowledge-center.solaredge.com/sites/kc/files/se-solaredge-home-battery-datasheet-nam.pdf"
+    date: "2026-09-03"
+    note: >-
+      1대당 9.7 kWh, 인버터당 최대 3대까지 적층, 왕복 효율 최대 94.5%.
+      PDF 원문 열람이 이 환경에서 차단되어 데이터시트 표기로 확인했다 — 원문 대조 필요
+todos:
+  - "충·방전 전력 한계를 인버터 조합별로 정리할 것 (포트당 40 A · 합계 12.5 kW는 인버터 쪽 표기다)"

@@ -1,8 +1,10 @@
-id: qcells-g4
+id: qcells-qhome
 vendor: Qcells
-display_name: Qcells G4 ESS — MSC / 게이트웨이 구성 (골격)
+display_name: Qcells Q.HOME — AC 결합 (AC 모듈 + COMBINER + HUB + CORE)
 status: draft
 
+# Q.HOME은 AC 결합 시스템이다. 모듈이 각자 AC를 내고 결합반에 모인다 —
+# 어레이에 DC 구간이 없고, 그래서 도면에도 DC 도체가 나오지 않는다.
 options:
   - id: backup_mode
     label: 백업 구성
@@ -11,147 +13,133 @@ options:
     choices:
       - value: "none"
         label: Grid support (백업 없음)
-        note: "계통 분리 장치를 두지 않는다. G4 ESS의 requires_one_of(MSC)를 만족하지 못한다"
+        note: "HUB 없이 결합반이 메인 패널 분기에 물린다. CORE의 requires_one_of를 만족하지 못해 E025가 뜬다"
       - value: partial
         label: 부분 백업
-        note: "분리 장치 부하측에 백업 서브패널"
+        note: "HUB 부하측에 백업 서브패널을 둔다"
       - value: whole_home
         label: 전체 백업
-        note: "서비스 도체 위 분리 장치"
-  - id: controller
-    label: 계통 분리 장치
+        note: "서비스 도체 위 Q.HOME HUB G3가 계통을 끊는다"
+  - id: ac_module_device
+    label: AC 모듈
     kind: enum
-    default: msc
+    default: qcells-qtron-blk-m-g2-ac
     choices:
-      - value: msc
-        label: G4 MSC
-        note: "역할 미확정 — 현재 class를 mid로 임시 분류했다"
-      - value: gateway
-        label: 게이트웨이/허브 (제품 미확정)
-        note: "MSC 대신 별치 게이트웨이를 두는 구성. 자리표시자 MID로 표현한다"
+      - value: qcells-qtron-blk-m-g2-ac
+        label: Q.TRON BLK M-G2+/AC 440
+        note: "마이크로인버터 일체형. DC가 함체 밖으로 나오지 않는다"
+  - id: battery_device
+    label: 축전지 모델
+    kind: enum
+    default: qcells-qhome-core-g3
+    choices:
+      - { value: qcells-qhome-core-g3, label: "Q.HOME CORE G3 (13.1 kWh · 7.6 kW)" }
   - id: pv_modules
-    label: PV 모듈 수
+    label: AC 모듈 수
     kind: int
     min: 1
-    max: 40
+    max: 44
     default: 20
     unit: "장"
-  - id: string_size
-    label: 스트링당 모듈
+    note: "Q.HOME COMBINER 80 G1은 AC 모듈 최대 44장을 받는다"
+  - id: branch_size
+    label: 분기회로당 모듈
     kind: int
     min: 1
-    max: 20
+    max: 22
     default: 10
     unit: "장"
-  - id: ess_units
-    label: G4 ESS 대수
+    note: "결합반 PV 회로는 최대 4계통이다. 분기당 최대 유닛 수는 매뉴얼 확인 전이다"
+  - id: battery_units
+    label: Q.HOME CORE 대수
     kind: int
     min: 0
-    max: 3
+    max: 2
     default: 1
     unit: "대"
+    note: "HUB G3 + CORE G3 2대 구성에서 26.24 kWh"
 
 nodes:
   - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
-  - ref: msc
-    device: qcells-g4-msc
-    label: G4 MSC (역할 미확정)
-    when: { controller: [msc], backup_mode: [partial, whole_home] }
-  - ref: gw
-    device: generic-mid-placeholder
-    label: 게이트웨이 (제품 미확정)
-    when: { controller: [gateway], backup_mode: [partial, whole_home] }
+  - ref: hub
+    device: qcells-qhome-hub-g3
+    label: Q.HOME HUB G3 (MID)
+    when: { backup_mode: [partial, whole_home] }
   - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
   - ref: sub
     device: generic-backup-subpanel-100a
     label: 백업 서브패널
     when: { backup_mode: [partial] }
-  - { ref: ess, device: qcells-g4-ess, label: G4 ESS, count_from: ess_units }
-  - ref: pv
-    device: generic-pv-module-400w
-    label: PV
-    repeat: { count: pv_modules, chunk: string_size }
+  - { ref: comb, device: qcells-qhome-combiner-80-g1, label: Q.HOME COMBINER 80 }
+  - { ref: core, device: qcells-qhome-core-g3, device_from: battery_device, label: Q.HOME CORE, count_from: battery_units }
+  - ref: acm
+    device: qcells-qtron-blk-m-g2-ac
+    device_from: ac_module_device
+    label: Q.TRON AC
+    repeat: { count: pv_modules, chunk: branch_size }
 
 edges:
   - from: svc.line
-    to: msc.grid_in
-    when: { controller: [msc], backup_mode: [whole_home] }
+    to: hub.grid_in
+    when: { backup_mode: [whole_home] }
     conductor: { ocpd_a: 200 }
-  - from: msc.load_out
+  - from: hub.load_out
     to: msp.main_lugs
-    when: { controller: [msc], backup_mode: [whole_home] }
-    conductor: { ocpd_a: 200 }
-  - from: svc.line
-    to: gw.grid_in
-    when: { controller: [gateway], backup_mode: [whole_home] }
-    conductor: { ocpd_a: 200 }
-  - from: gw.load_out
-    to: msp.main_lugs
-    when: { controller: [gateway], backup_mode: [whole_home] }
-    conductor: { ocpd_a: 200 }
-
+    when: { backup_mode: [whole_home] }
+    conductor: { ocpd_a: 200, note: "MID 부하측 — 전 부하가 아일랜드에 포함된다" }
   - from: svc.line
     to: msp.main_lugs
     when: { backup_mode: ["none", partial] }
     conductor: { ocpd_a: 200 }
   - from: msp.branch
-    to: msc.grid_in
-    when: { controller: [msc], backup_mode: [partial] }
-    conductor: { ocpd_a: null }
-  - from: msc.load_out
+    to: hub.grid_in
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null, note: "백업 경계로 가는 피더" }
+  - from: hub.load_out
     to: sub.feed
-    when: { controller: [msc], backup_mode: [partial] }
-    conductor: { ocpd_a: null }
-  - from: msp.branch
-    to: gw.grid_in
-    when: { controller: [gateway], backup_mode: [partial] }
-    conductor: { ocpd_a: null }
-  - from: gw.load_out
-    to: sub.feed
-    when: { controller: [gateway], backup_mode: [partial] }
-    conductor: { ocpd_a: null }
-
-  - from: pv.dc_out
-    to: pv.dc_in
-    fanout: chain
-    conductor: { note: "직렬 — 전압이 더해진다" }
-  - from: pv.dc_out
-    to: ess.pv_dc
-    fanout: chunk_last
-    conductor: { note: "스트링 종단 → ESS MPPT" }
-
-  - from: ess.ac_out
-    to: msp.branch
-    fanout: each
-    when: { backup_mode: ["none", whole_home] }
-    conductor: { ocpd_a: null, note: "백피드 OCPD 미기재" }
-  - from: ess.ac_out
-    to: sub.branch
-    fanout: each
     when: { backup_mode: [partial] }
     conductor: { ocpd_a: null }
 
-  - from: ess.comms
-    to: msc.comms
-    layer: comms
-    fanout: first
-    when: { controller: [msc], backup_mode: [partial, whole_home] }
-  - from: ess.comms
-    to: gw.comms
-    layer: comms
-    fanout: first
-    when: { controller: [gateway], backup_mode: [partial, whole_home] }
+  # ── AC 모듈: 모듈이 각자 AC를 내고 트렁크로 모인다 ────────
+  - from: acm.ac_out
+    to: acm.trunk_in
+    fanout: chain
+    conductor: { note: "AC 트렁크 — 하류로 갈수록 모듈 전류가 누적된다" }
+  - from: acm.ac_out
+    to: comb.pv_ac_in
+    fanout: chunk_last
+    conductor: { ocpd_a: null, note: "분기회로 종단 → 결합반 차단기" }
+
+  - from: comb.main_ac
+    to: msp.branch
+    when: { backup_mode: ["none", whole_home] }
+    conductor: { ocpd_a: null, note: "부하측 인터커넥션 — 버스바 정격 대비 검토 대상" }
+  - from: comb.main_ac
+    to: sub.branch
+    when: { backup_mode: [partial] }
+    conductor: { ocpd_a: null }
+  - from: core.ac_out
+    to: comb.battery_ac
+    fanout: each
+    conductor: { ocpd_a: null }
+
+  - { from: core.comms, to: comb.comms, layer: comms, fanout: each }
+  - { from: hub.comms, to: comb.comms, layer: comms, when: { backup_mode: [partial, whole_home] } }
 
 presets:
-  - id: qcells-g4-msc-whole-home
-    display_name: "G4 ESS + MSC — 전체 백업 (골격)"
-    options: { backup_mode: whole_home, controller: msc, pv_modules: 20, string_size: 10, ess_units: 1 }
+  - id: qcells-qhome-core-g3-whole-home
+    display_name: "Q.TRON AC + COMBINER 80 + HUB G3 + CORE G3 — 전체 백업"
+    options: { backup_mode: whole_home, pv_modules: 20, branch_size: 10, battery_units: 1,
+               ac_module_device: qcells-qtron-blk-m-g2-ac, battery_device: qcells-qhome-core-g3 }
 
 sources:
-  - ref: "CLAUDE.md §3.3 — 'Qcells G4 ESS (MSC/MID 구성). 내부 사양 기준'"
-    date: null
-    note: "이 골격은 위 한 줄에서만 도출됐다. 내부 사양 문서 대조 전이다"
+  - ref: "Qcells Q.HOME CORE G3 / Q.TRON AC / Q.HOME COMBINER 공식 페이지 및 문서"
+    url: "https://us.qcells.com/qhome-core-g3/"
+    date: "2026-09-03"
+    note: >-
+      백업 구성은 AC 모듈 + AC 결합반 + 축전지 + 백업 유닛(HUB)으로 이뤄진다.
+      PDF 원문 열람이 이 환경에서 차단되어 공식 페이지·문서 표기로 확인했다
 todos:
-  - "MSC의 역할이 확정되면 노드 구성이 바뀐다 (계량/결합이 분리될 가능성)"
-  - "게이트웨이 선택지는 구조만 표현한 것이다. 실제 제품 라인업 확인 전이다"
-  - "전 수치 null 유지 — 내부 사양 확인 전까지 신호 계산이 성립하지 않는다"
+  - "HUB G3의 서비스 정격과 전환 방식 확인"
+  - "AC 모듈 내장 마이크로인버터의 연속 출력이 null이라 트렁크 전류가 정격 기반으로만 계산된다"
+  - "결합반 PV 회로 4계통 한도와 분기당 모듈 수 한도를 매뉴얼에서 확인할 것"

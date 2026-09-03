@@ -1,0 +1,32 @@
+id: enphase-iq-battery-5p
+vendor: Enphase
+display_name: IQ Battery 5P
+class: ac_battery
+status: draft
+ratings:
+  usable_energy_kwh: 5.0
+  continuous_ac_kva: 3.84
+  peak_ac_kw: 7.68        # 3초. 10초 정격은 6.14 kW
+  lra: null               # TODO: 소프트스타트 조건부 값. 매뉴얼 확인
+ports:
+  - { id: ac_out, type: ac_240v_split, direction: bidirectional }
+  - { id: comms, type: comms_proprietary, direction: bidirectional }
+provides_mid: false
+grid_forming: true          # 내장 IQ8D-BAT 마이크로인버터가 아일랜드를 세운다
+black_start_capable: null   # TODO: 무잔량 기동 가능 여부 확인
+requires_one_of: [enphase-iq-meter-collar, generic-mid-placeholder]
+needs_backup_subpanel: "no"
+certifications: [UL1741-SB]
+utility_approval: null
+sources:
+  - ref: "Enphase IQ Battery 5P 데이터시트 / 제품 페이지"
+    url: "https://enphase.com/store/storage/gen3/iq-battery-5p"
+    date: "2026-09-03"
+    note: >-
+      사용 가능 용량 5.0 kWh · 연속 3.84 kVA · 피크 7.68 kW(3초) / 6.14 kW(10초).
+      내부에 IQ8D-BAT 마이크로인버터 6대를 품은 AC 결합 유닛이다.
+      PDF 원문 열람이 이 환경에서 차단되어 공식 페이지 표기로 확인했다 — 원문 대조 필요
+todos:
+  - "LRA(모터 기동) 정격 확인 — 백업 시 에어컨 성립 여부를 가른다"
+  - "최대 확장 유닛 수 확인"
+  - "grid_forming=true는 내장 마이크로인버터 구성에서 도출했다. 매뉴얼 문구로 재확인 필요"

@@ -15,8 +15,9 @@ needs_backup_subpanel: "no"
 certifications: []
 utility_approval: null
 sources:
-  - ref: "Enphase 4세대 시스템 구성 문서"
-    date: null
+  - ref: "Enphase 4세대 시스템 구성 문서 / IQ Combiner 6C"
+    url: "https://enphase.com/store/communication/iq-combiner-6c"
+    date: "2026-09-03"
     note: "포트 구성 원문 대조 필요"
 todos:
   - "내부 브레이커 구성 및 버스바 정격 확인"

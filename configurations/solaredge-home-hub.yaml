@@ -1,6 +1,6 @@
-id: solaredge-nexis
+id: solaredge-home-hub
 vendor: SolarEdge
-display_name: SolarEdge Nexis 계열 — DC 결합 (골격)
+display_name: SolarEdge Home Hub — DC 결합 + Home Battery 400V
 status: draft
 
 options:
@@ -11,13 +11,24 @@ options:
     choices:
       - value: "none"
         label: Grid support (백업 없음)
-        note: "MID 없이 계통 병렬 접속만"
+        note: "Backup Interface 없이 계통 병렬 접속만. 인버터의 requires_one_of를 만족하지 못해 E025가 뜬다"
       - value: partial
         label: 부분 백업
-        note: "MID 부하측에 백업 서브패널"
+        note: "Backup Interface 부하측에 백업 서브패널을 둔다"
       - value: whole_home
         label: 전체 백업
-        note: "서비스 도체 위 MID. 제품이 이 구성을 지원하는지 확인 전이다"
+        note: "서비스 도체 위 Backup Interface (서비스 200A까지)"
+  - id: pv_module_device
+    label: PV 모듈
+    kind: enum
+    default: generic-pv-module-400w
+    choices:
+      - value: generic-pv-module-400w
+        label: PV 모듈 400W (모델링 기준)
+        note: "SolarEdge는 모듈을 만들지 않는다. 전기 정격이 들어 있어 DC 신호가 계산된다"
+      - value: qcells-qtron-blk-m-g2
+        label: Qcells Q.TRON BLK M-G2+ 440
+        note: "실제 제품. STC 전기 정격이 미입력이라 DC 전압·전류는 계산되지 않는다"
   - id: pv_modules
     label: PV 모듈 수
     kind: int
@@ -32,38 +43,49 @@ options:
     max: 20
     default: 10
     unit: "장"
+    note: "Power Optimizer를 노드로 모델링하지 않아 스트링 전압은 모듈 직렬 합의 근사다"
   - id: inverter_units
-    label: 하이브리드 인버터 대수
+    label: Home Hub 인버터 대수
+    kind: int
+    min: 1
+    max: 3
+    default: 1
+    unit: "대"
+    note: "Backup Interface는 인버터 3대까지 지원한다"
+  - id: battery_units
+    label: Home Battery 400V 대수
     kind: int
     min: 0
     max: 3
     default: 1
     unit: "대"
-    note: "2대 이상은 병렬. 스트링은 유닛 수만큼 나눠 붙는다"
+    note: "인버터 1대당 최대 3대 적층. DC측에 붙는다"
 
 nodes:
   - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }
-  - ref: mid
-    device: generic-mid-placeholder
-    label: MID (제품 미확정)
+  - ref: bi
+    device: solaredge-backup-interface
+    label: Backup Interface (MID)
     when: { backup_mode: [partial, whole_home] }
   - { ref: msp, device: generic-msp-200a, label: 메인 서비스 패널 200A }
   - ref: sub
     device: generic-backup-subpanel-100a
     label: 백업 서브패널
     when: { backup_mode: [partial] }
-  - { ref: inv, device: solaredge-nexis-hybrid, label: Nexis 하이브리드, count_from: inverter_units }
+  - { ref: inv, device: solaredge-home-hub-se7600h, label: Home Hub SE7600H, count_from: inverter_units }
+  - { ref: batt, device: solaredge-home-battery-400v, label: Home Battery 400V, count_from: battery_units }
   - ref: pv
     device: generic-pv-module-400w
+    device_from: pv_module_device
     label: PV
     repeat: { count: pv_modules, chunk: string_size }
 
 edges:
   - from: svc.line
-    to: mid.grid_in
+    to: bi.grid_in
     when: { backup_mode: [whole_home] }
-    conductor: { ocpd_a: 200 }
-  - from: mid.load_out
+    conductor: { ocpd_a: 200, note: "서비스 200A까지" }
+  - from: bi.load_out
     to: msp.main_lugs
     when: { backup_mode: [whole_home] }
     conductor: { ocpd_a: 200 }
@@ -72,50 +94,60 @@ edges:
     when: { backup_mode: ["none", partial] }
     conductor: { ocpd_a: 200 }
   - from: msp.branch
-    to: mid.grid_in
+    to: bi.grid_in
     when: { backup_mode: [partial] }
-    conductor: { ocpd_a: null }
-  - from: mid.load_out
+    conductor: { ocpd_a: null, note: "백업 경계로 가는 피더" }
+  - from: bi.load_out
     to: sub.feed
     when: { backup_mode: [partial] }
     conductor: { ocpd_a: null }
 
+  # ── PV: 직렬 스트링 → MPPT ───────────────────────────────
   - from: pv.dc_out
     to: pv.dc_in
     fanout: chain
-    conductor: { note: "직렬 — 전압이 더해진다" }
+    conductor: { note: "직렬 — 전압이 더해지고 전류는 같다" }
   - from: pv.dc_out
     to: inv.pv_dc
     fanout: chunk_last
-    conductor: { note: "스트링 종단 → 인버터 MPPT 직결" }
+    conductor: { note: "스트링 종단 → 인버터 MPPT" }
 
+  # ── DC측 축전지 ─────────────────────────────────────────
+  - from: batt.dc_out
+    to: inv.battery_dc
+    fanout: each
+    conductor: { note: "DC 결합 — 포트당 최대 40 A, 충·방전 합계 최대 12.5 kW" }
+
+  # ── 인버터 출력 ─────────────────────────────────────────
   - from: inv.ac_out
     to: msp.branch
     fanout: each
     when: { backup_mode: ["none", whole_home] }
-    conductor: { ocpd_a: null, note: "백피드 OCPD 미기재 — 연속 출력 확인 후 산출" }
+    conductor: { ocpd_a: 40, note: "연속 출력 32 A(240V) 기준 산출값 — 매뉴얼 대조 필요" }
   - from: inv.ac_out
     to: sub.branch
     fanout: each
     when: { backup_mode: [partial] }
-    conductor: { ocpd_a: null }
+    conductor: { ocpd_a: 40 }
 
   - from: inv.comms
-    to: mid.comms
+    to: bi.comms
     layer: comms
     fanout: first
     when: { backup_mode: [partial, whole_home] }
 
 presets:
   - id: solaredge-dc-coupled-whole-home
-    display_name: "Nexis 계열 DC 결합 — 전체 백업 (골격)"
-    options: { backup_mode: whole_home, pv_modules: 20, string_size: 10, inverter_units: 1 }
+    display_name: "Home Hub SE7600H + Home Battery 400V — 전체 백업"
+    options: { backup_mode: whole_home, pv_modules: 20, string_size: 10, inverter_units: 1,
+               battery_units: 1, pv_module_device: generic-pv-module-400w }
 
 sources:
-  - ref: "CLAUDE.md §3.3 — 'SolarEdge(Nexis 계열): DC 결합, 스트링 구조'"
-    date: null
-    note: "이 골격은 위 한 줄에서만 도출됐다. 제품 문서 대조 전이다"
+  - ref: "SolarEdge Home Hub Inverter 데이터시트 (북미)"
+    url: "https://knowledge-center.solaredge.com/sites/kc/files/se-solaredge-home-hub-inverter-datasheet-nam.pdf"
+    date: "2026-09-03"
+    note: "백업은 별매 Backup Interface(서비스 200A까지, 인버터 3대까지)로 구성한다"
 todos:
-  - "전체 백업을 가정해 모델링했다. 실제 제품이 이 구성을 지원하는지 확인 후 backup_scope 확정"
-  - "MID 자리표시자를 실제 제품으로 교체"
-  - "DC 결합 축전지를 별도 노드로 분리할지 결정 — 현재 인버터에 합쳐져 있다"
+  - "Power Optimizer를 노드 클래스로 추가할지 결정 — 모듈 단위 DC-DC가 스트링 전압을 정한다"
+  - "Backup Interface 전용 데이터시트로 정격·포트 구성 확인"
+  - "인버터 2대 이상일 때 축전지 배분과 통신 구성 확인 (현재 첫 유닛만 MID에 연결한다)"
