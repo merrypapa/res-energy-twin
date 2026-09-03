@@ -27,6 +27,14 @@ export const GEO = {
   arrayNodeW: 88,
   /** 배열 노드끼리의 간격 */
   arrayColGap: 14,
+  /** 배열 블록을 접는 최대 열 수. 넘으면 아래 행으로 넘어간다 */
+  arrayMaxCols: 10,
+  /** 블록 안 행 간격 */
+  arrayRowGap: 34,
+  /** 세로로 짝지어진 두 노드(모듈 위 / 인버터 아래) 사이 간격 */
+  stackGap: 26,
+  /** 블록에서 빠져나가는 도체가 타고 내려가는 우측 레인 */
+  laneGap: 26,
   nodeH: 88,
   colGap: 40,
   rankGap: 60,

@@ -18,6 +18,8 @@ export interface RenderOptions {
   scenario?: string | null;
   /** 선택된 노드 ref. 표시는 선(파선 테두리)으로만 한다 — 색은 활선/사선 전용이다. */
   selected?: string | null;
+  /** 선택된 포트 id(선택된 노드 안에서). 단자 점에 고리를 그린다. */
+  selectedPort?: string | null;
 }
 
 const DISCLAIMER =
@@ -59,6 +61,13 @@ function styles(): string {
   .node { cursor: pointer; }
   .node.selected .sym, .node.selected .sym-bus { stroke-width: 2.4; }
   .select-box { fill: none; stroke: ${THEME.ink}; stroke-width: 1; stroke-dasharray: 4 3; }
+  /* 단자: 도체가 제품을 떠나는 지점. 신호를 보는 손잡이다 */
+  .port { cursor: pointer; }
+  .port .dot { fill: ${THEME.bg}; stroke: ${THEME.ink}; stroke-width: 1.4; }
+  .port.dead .dot { stroke: ${THEME.dead}; }
+  .port .hit { fill: transparent; stroke: none; }
+  .port.selected .dot { fill: ${THEME.ink}; }
+  .port.selected .ring { fill: none; stroke: ${THEME.ink}; stroke-width: 1; }
   .halo { fill: ${THEME.bg}; stroke: none; }`;
 }
 
@@ -225,6 +234,19 @@ export function renderTopology(topology: Topology, devices: Device[], opts: Rend
   for (const n of graph.nodes) {
     body.push(
       renderNode(graph, layout, n.ref, nodeState(graph, n.ref, energization), opts.selected === n.ref),
+    );
+  }
+  // 단자 점은 도체와 심볼 위에 얹는다 — 클릭 대상이므로 가려지면 안 된다.
+  for (const p of layout.ports) {
+    const state = nodeState(graph, p.ref, energization);
+    const chosen = opts.selected === p.ref && opts.selectedPort === p.portId;
+    body.push(
+      `<g class="port ${state}${chosen ? " selected" : ""}" data-ref="${esc(p.ref)}" data-port="${esc(p.portId)}">` +
+        `<circle class="hit" cx="${round(p.x)}" cy="${round(p.y)}" r="9"/>` +
+        (chosen ? `<circle class="ring" cx="${round(p.x)}" cy="${round(p.y)}" r="6.5"/>` : "") +
+        `<circle class="dot" cx="${round(p.x)}" cy="${round(p.y)}" r="3.4"/>` +
+        `<title>${esc(p.ref)}.${esc(p.portId)}</title>` +
+        `</g>`,
     );
   }
 
