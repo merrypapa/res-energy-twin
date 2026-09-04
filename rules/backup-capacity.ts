@@ -80,7 +80,7 @@ const rule: Rule = {
           severity: "info",
           code: "R030.3",
           message:
-            `전원 정격이 kVA(${kvaSum} kVA)로만 주어져 kW 부하 ${load} kW와 직접 비교할 수 없다. ` +
+            `전원 정격이 kVA(${q(kvaSum)} kVA)로만 주어져 kW 부하 ${q(load)} kW와 직접 비교할 수 없다. ` +
             `역률을 알아야 판정 가능하다`,
           refs: sources.map((n) => n.ref),
         }),
@@ -94,9 +94,9 @@ const rule: Rule = {
           severity: "warning",
           code: "R030",
           message:
-            `백업 부하 ${load} kW 가 인버터 연속 출력 ${kwSum} kW 를 초과한다. ` +
+            `백업 부하 ${q(load)} kW 가 인버터 연속 출력 ${q(kwSum)} kW 를 초과한다. ` +
             `부하 차단 또는 백업 경계 축소 필요` +
-            (kvaSum > 0 ? ` (별도로 ${kvaSum} kVA 전원이 있으나 단위가 달라 합산하지 않았다)` : ""),
+            (kvaSum > 0 ? ` (별도로 ${q(kvaSum)} kVA 전원이 있으나 단위가 달라 합산하지 않았다)` : ""),
           refs: sources.map((n) => n.ref),
         }),
       );
@@ -105,7 +105,7 @@ const rule: Rule = {
         finding(rule, {
           severity: "info",
           code: "R030.ok",
-          message: `백업 부하 ${load} kW ≤ 연속 출력 ${kwSum} kW`,
+          message: `백업 부하 ${q(load)} kW ≤ 연속 출력 ${q(kwSum)} kW`,
           refs: sources.map((n) => n.ref),
         }),
       );
@@ -115,10 +115,18 @@ const rule: Rule = {
   },
 };
 
+/**
+ * 표시용 반올림. 0.1 + 0.24 같은 합산이 10.339999999999996으로 새어 나오는 것을 막는다.
+ * 판정은 원래 값으로 하고 문장만 다듬는다 — 비교에 이 함수를 쓰면 안 된다.
+ */
+function q(v: number): string {
+  return String(Math.round(v * 1000) / 1000);
+}
+
 function describe(kwSum: number, kvaSum: number): string {
   const parts: string[] = [];
-  if (kwSum > 0) parts.push(`${kwSum} kW`);
-  if (kvaSum > 0) parts.push(`${kvaSum} kVA`);
+  if (kwSum > 0) parts.push(`${q(kwSum)} kW`);
+  if (kvaSum > 0) parts.push(`${q(kvaSum)} kVA`);
   return parts.length > 0 ? parts.join(" + ") : "정격 없음";
 }
 

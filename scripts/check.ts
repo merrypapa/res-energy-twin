@@ -66,7 +66,7 @@ if (!sitePath) {
 }
 if (unverified.size > 0) {
   console.log(
-    `\n조문 원문 미대조 룰: ${[...unverified].sort().join(", ")}\n` +
+    `\n근거 원문 미대조 룰: ${[...unverified].sort().join(", ")}\n` +
       `verified=false인 동안 이 출력은 사내 배포용 근거가 아니다. 전기 엔지니어 리뷰 필요.`,
   );
 }

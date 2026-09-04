@@ -26,7 +26,17 @@ const patch = (id: string, over: Record<string, unknown>) =>
 
 describe("룰 레지스트리", () => {
   it("CLAUDE.md §5가 지정한 항목이 등록되어 있다", () => {
-    expect(RULES.map((r) => r.id)).toEqual(["R010", "R020", "R030", "R040", "R050"]);
+    // 목록을 통째로 고정하지 않는다 — 룰이 늘 때마다 깨지는 테스트는 아무것도 지키지 않는다.
+    // 지켜야 할 것은 "§5 항목이 빠지지 않는다"이다.
+    const ids = RULES.map((r) => r.id);
+    for (const required of ["R010", "R020", "R030", "R040", "R050"]) {
+      expect(ids).toContain(required);
+    }
+  });
+
+  it("룰 id가 중복되지 않는다 — 같은 id 두 개면 결과에서 구분되지 않는다", () => {
+    const ids = RULES.map((r) => r.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("조문을 인용하는 룰은 전부 verified=false다 — 원문 대조 전까지 근거가 아니다", () => {
@@ -179,8 +189,18 @@ describe("R030 — 백업 부하 대비 연속 출력", () => {
   });
 
   it("정격 없는 전원이 합산에서 빠진 사실을 숨기지 않는다", () => {
-    // Qcells AC 모듈은 내장 마이크로인버터의 연속 출력이 아직 확인되지 않았다.
-    expect(find(run(qcells), "R030.1")?.message).toContain("qcells-qtron-ac-microinverter");
+    // 특정 제품이 미확인이라는 사실에 걸지 않는다 — 데이터가 채워지면 깨질 뿐 아무것도 지키지 않는다.
+    // 지켜야 할 것은 "정격이 비면 조용히 0으로 합산하지 않고 그 사실을 보고한다"이다.
+    const stripped = patch("qcells-qtron-ac-microinverter", {
+      ratings: { continuous_ac_kw: null, continuous_ac_kva: null },
+    });
+    expect(find(run(qcells, EMPTY_SITE, stripped), "R030.1")?.message).toContain(
+      "qcells-qtron-ac-microinverter",
+    );
+    // 채워져 있으면 그 제품은 미확인 목록에 오르지 않는다.
+    expect(find(run(qcells), "R030.1")?.message ?? "").not.toContain(
+      "qcells-qtron-ac-microinverter",
+    );
   });
 
   it("count가 반영된다 — 유닛을 늘리면 합계가 커진다", () => {
@@ -251,6 +271,53 @@ describe("R050 — 유틸리티 승인", () => {
     const approvalRefs = r.findings.filter((f) => f.code.startsWith("R050")).flatMap((f) => f.refs);
     expect(approvalRefs).not.toContain("msp");
     expect(approvalRefs).not.toContain("pv");
+  });
+});
+
+describe("R070 — 분기회로당 유닛 수", () => {
+  const of = (r: ReturnType<typeof runRules>, code: string) =>
+    r.findings.filter((f) => f.code === code);
+
+  it("분기마다 유닛 수를 세어 제조사 상한과 비교한다", () => {
+    const ok = of(run(qcells), "R070.ok");
+    expect(ok.length).toBe(2); // 마이크로인버터 분기 2개
+    for (const f of ok) expect(f.message).toContain("10대 ≤ 상한 11대");
+    expect(codes(run(qcells))).not.toContain("R070");
+  });
+
+  it("상한을 낮추면 같은 구성이 경고로 바뀐다 — 판정이 데이터에서 나온다", () => {
+    const tight = patch("qcells-qtron-ac-microinverter", {
+      ratings: { max_units_per_branch: 4 },
+    });
+    const warned = of(run(qcells, EMPTY_SITE, tight), "R070");
+    expect(warned.length).toBe(2);
+    expect(warned[0]!.severity).toBe("warning");
+    expect(warned[0]!.message).toContain("10대");
+    expect(warned[0]!.message).toContain("상한은 4대");
+    // 경고가 위반한 유닛들을 지목한다 — 어느 분기인지 알 수 없으면 고칠 수 없다.
+    expect(warned[0]!.refs.length).toBe(10);
+    expect(codes(run(qcells, EMPTY_SITE, tight))).not.toContain("R070.ok");
+  });
+
+  it("상한이 미확인인 제품은 통과를 주장하지 않고 보류로 남긴다", () => {
+    const r = run(enphase);
+    expect(find(r, "R070.1")?.message).toContain("enphase-iq8m");
+    expect(codes(r)).not.toContain("R070.ok");
+    expect(codes(r)).not.toContain("R070");
+  });
+
+  it("AC 분기에 출력하지 않는 장치는 세지 않는다 — 모듈 직렬 수는 다른 문제다", () => {
+    // 모듈도 분기 그룹을 갖는다. 그룹이 있는데도 R070이 건드리지 않아야 의미가 있다.
+    const grouped = qcells.nodes.filter(
+      (n) => n.device === "qcells-qtron-blk-m-g2" && n.group !== null,
+    );
+    expect(grouped.length).toBeGreaterThan(0);
+
+    const r070 = run(qcells).findings.filter((f) => f.code.startsWith("R070"));
+    const said = r070.map((f) => f.message).join("\n");
+    expect(said).not.toContain("qcells-qtron-blk-m-g2");
+    const refs = r070.flatMap((f) => f.refs);
+    for (const n of grouped) expect(refs).not.toContain(n.ref);
   });
 });
 

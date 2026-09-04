@@ -72,7 +72,7 @@ export function FindingList({ results, dataFindings }: { results: Result[]; data
       ))}
       {unverified.length > 0 && (
         <p className="empty">
-          조문 원문 미대조 룰: {unverified.join(", ")}. 이 판정은 사내 배포용 근거가 아니다 —
+          근거 원문 미대조 룰: {unverified.join(", ")}. 이 판정은 사내 배포용 근거가 아니다 —
           전기 엔지니어 리뷰가 필요하다.
         </p>
       )}

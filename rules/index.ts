@@ -4,6 +4,7 @@ import supplySideTap from "./supply-side-tap.js";
 import backupCapacity from "./backup-capacity.js";
 import motorStart from "./motor-start.js";
 import utilityApproval from "./utility-approval.js";
+import branchUnits from "./branch-units.js";
 
 /**
  * 룰 레지스트리. 파일을 추가하고 여기 등록하면 끝이다.
@@ -18,4 +19,5 @@ export const RULES: readonly Rule[] = [
   backupCapacity,
   motorStart,
   utilityApproval,
+  branchUnits,
 ];

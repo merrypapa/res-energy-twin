@@ -67,8 +67,16 @@ describe("비교표", () => {
   });
 
   it("정격이 없는 전원이 합산에서 빠진 사실을 표시한다", () => {
-    // Qcells 내장 마이크로인버터는 연속 출력이 미확인이라 합산에서 빠진다.
-    expect(cell(cmp(pick("qcells")), "continuous", "Qcells")).toContain("미기재 20건 제외");
+    // 어느 제품이 미확인인지에 매지 않는다 — 정격을 지운 사본으로 본다.
+    const stripped = devices.map((d) =>
+      d.id === "qcells-qtron-ac-microinverter"
+        ? Device.parse({ ...d, ratings: { ...d.ratings, continuous_ac_kw: null, continuous_ac_kva: null } })
+        : d,
+    );
+    const c = compareTopologies(pick("qcells"), stripped, {});
+    expect(cell(c, "continuous", "Qcells")).toContain("미기재 20건 제외");
+    // 채워지면 그 표기가 사라지고 값이 합산된다.
+    expect(cell(cmp(pick("qcells")), "continuous", "Qcells")).not.toContain("미기재");
   });
 
   it("MID가 확정되지 않은 구성은 그 사실을 노트로 남긴다", () => {
