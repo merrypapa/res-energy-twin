@@ -71,6 +71,8 @@ export const Ratings = z
     continuous_ac_kw: z.number().positive().nullable().default(null),
     continuous_ac_kva: z.number().positive().nullable().default(null),
     peak_ac_kw: z.number().positive().nullable().default(null),
+    /** 피상전력 기준 피크 출력(kVA). kW와 섞지 않는다 — 역률 없이 환산하면 없는 정보를 만든다. */
+    peak_ac_kva: z.number().positive().nullable().default(null),
     lra: z.number().positive().nullable().default(null),
     pv_mppt_count: z.number().int().positive().nullable().default(null),
     max_pv_dc_kw: z.number().positive().nullable().default(null),
@@ -95,6 +97,11 @@ export const Ratings = z
     mppt_v_max: z.number().positive().nullable().default(null),
     /** 최대 연속 출력 전류(A). 도체·OCPD 산정의 근거다. */
     max_continuous_ac_a: z.number().positive().nullable().default(null),
+    /**
+     * 한 분기회로에 물릴 수 있는 최대 유닛 수. 마이크로인버터처럼 트렁크에 여러 대가
+     * 물리는 제품에서 제조사가 정하는 값이다. 분기 차단기 정격이 상한을 만든다.
+     */
+    max_units_per_branch: z.number().int().positive().nullable().default(null),
     main_ocpd_a: z.number().positive().nullable().default(null),
     service_a: z.number().positive().nullable().default(null),
   })
