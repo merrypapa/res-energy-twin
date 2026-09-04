@@ -294,3 +294,56 @@ describe("트렁크 누적과 유닛 자체 출력", () => {
     expect(acOut("mi-01").basis.join(" ")).not.toContain("누적값");
   });
 });
+
+describe("모듈 I–V · MPPT", () => {
+  const module = () => devices.find((d) => d.id === "qcells-qtron-blk-m-g2")!;
+  const at = (irr: number) => {
+    const tpl = templates.find((t) => t.id === "qcells-qhome")!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, devices, ["power", "comms"]);
+    const op = OperatingPoint.parse({ irradiance: irr, house_load_kw: 2 });
+    return nodeSignals(g, "pv-01", computePowerFlow(g, op, {}), op);
+  };
+
+  it("STC 정격이 데이터시트 값과 맞는다", () => {
+    const r = module().ratings;
+    expect(r.pv_vmp_v).toBe(33.33);
+    expect(r.pv_imp_a).toBe(13.2);
+    expect(r.pv_voc_v).toBe(39.88);
+    expect(r.pv_isc_a).toBe(13.9);
+  });
+
+  it("Vmp × Imp 가 명판 출력과 맞는다 — 전사 오류를 잡는 검산", () => {
+    const r = module().ratings;
+    expect(r.pv_vmp_v! * r.pv_imp_a!).toBeCloseTo(r.pv_stc_w!, 0);
+  });
+
+  it("Vmp < Voc, Imp < Isc — 물리적으로 성립하는 값이어야 한다", () => {
+    const r = module().ratings;
+    expect(r.pv_vmp_v!).toBeLessThan(r.pv_voc_v!);
+    expect(r.pv_imp_a!).toBeLessThan(r.pv_isc_a!);
+  });
+
+  it("모듈 노드에 I–V 곡선이 나온다", () => {
+    const iv = at(1.0).iv!;
+    expect(iv).not.toBeNull();
+    expect(iv.mpp.p).toBeCloseTo(440, 0);
+  });
+
+  it("MPP가 일사를 따라 움직인다", () => {
+    expect(at(1.0).iv!.mpp.p).toBeCloseTo(440, 0);
+    expect(at(0.5).iv!.mpp.p).toBeCloseTo(220, 0);
+    expect(at(0.5).iv!.mpp.i).toBeCloseTo(at(1.0).iv!.mpp.i / 2, 3);
+  });
+
+  it("곡선이 근사이고 전압을 고정한다는 사실을 화면에 띄운다", () => {
+    const iv = at(1.0).iv!;
+    expect(iv.model).toContain("실측 곡선 아님");
+    expect(iv.model).toContain("STC 값 고정");
+  });
+
+  it("정격이 채워졌으므로 DC 단자에 전압·전류가 나온다", () => {
+    const dc = at(1.0).ports.find((p) => p.port_id === "dc_out")!;
+    expect(dc.v).toBeCloseTo(33.33, 2);
+    expect(dc.i).toBeCloseTo(13.2, 2);
+  });
+});

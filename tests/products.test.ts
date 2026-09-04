@@ -8,6 +8,7 @@ import { nodeSignals } from "../src/analysis/signals.js";
 import { specRows, specSheets } from "../src/analysis/spec.js";
 import { OperatingPoint } from "../src/analysis/operating-point.js";
 import { portElectrical } from "../src/schema/electrical.js";
+import { Device } from "../src/schema/device.js";
 
 const devices = loadDevices("device-library").items;
 const templates = loadConfigurations("configurations").items;
@@ -34,11 +35,29 @@ describe("제품 데이터 규율", () => {
   });
 
   it("확인되지 않은 값은 채우지 않는다 — 링크만 있고 값이 없는 제품이 있어도 된다", () => {
-    // Q.TRON 모듈은 STC 전기 정격이 미확인이다. 그 사실이 데이터에 그대로 남아 있어야 한다.
-    const m = dev("qcells-qtron-blk-m-g2");
-    expect(m.ratings.pv_stc_w).toBe(440);
-    expect(m.ratings.pv_vmp_v).toBeNull();
-    expect(m.todos.join(" ")).toContain("Vmp");
+    // 스키마가 이 상태를 허용해야 한다. 값을 못 구했다고 제품을 못 올리면
+    // 추정치를 넣게 된다 — 그걸 막는 것이 이 프로젝트의 전제다.
+    const linkOnly = Device.parse({
+      id: "vendor-x-unconfirmed",
+      vendor: "VendorX",
+      display_name: "정격 미확인 제품",
+      class: "pv_module",
+      status: "draft",
+      ports: [{ id: "dc_out", type: "dc_pv_module", direction: "out" }],
+      provides_mid: false,
+      sources: [{ ref: "제조사 페이지", url: "https://example.invalid/x", date: "2026-09-04" }],
+      todos: ["STC 전기 정격 확인"],
+    });
+    expect(linkOnly.ratings.pv_stc_w).toBeNull();
+    expect(linkOnly.sources[0]!.url).not.toBeNull();
+  });
+
+  it("값이 채워진 제품에는 출처가 붙어 있다", () => {
+    for (const d of devices) {
+      const hasNumber = Object.values(d.ratings).some((v) => typeof v === "number");
+      if (!hasNumber) continue;
+      expect(`${d.id}: sources ${d.sources.length}`).not.toBe(`${d.id}: sources 0`);
+    }
   });
 });
 
@@ -76,14 +95,36 @@ describe("AC 모듈 — 모듈 + 변환기를 나눠 그린다", () => {
   });
 
   it("정격이 미확인인 모듈을 고르면 DC 전압·전류를 계산하지 않고 이유를 남긴다", () => {
-    const t = composeTopology(tpl("qcells-qhome")).topology; // 기본값 = Q.TRON (Vmp/Imp 미입력)
-    const g = buildRenderGraph(t, devices, ["power"]);
+    // 어느 제품이 미입력인지에 매지 않는다 — 모듈의 STC 전기 정격을 지운 사본으로 본다.
+    const stripped = devices.map((d) =>
+      d.class === "pv_module"
+        ? Device.parse({
+            ...d,
+            ratings: { ...d.ratings, pv_vmp_v: null, pv_imp_a: null, pv_voc_v: null, pv_isc_a: null },
+          })
+        : d,
+    );
+    const t = composeTopology(tpl("qcells-qhome")).topology;
+    const g = buildRenderGraph(t, stripped, ["power"]);
     const flow = computePowerFlow(g, OP, { scenario: scenarios.find((s) => s.id === "grid_normal")! });
-    const dcOut = nodeSignals(g, "pv-01", flow, OP).ports.find((p) => p.port_id === "dc_out")!;
+    const report = nodeSignals(g, "pv-01", flow, OP);
+    const dcOut = report.ports.find((p) => p.port_id === "dc_out")!;
     expect(dcOut.p_kw).toBeGreaterThan(0); // 출력(W)은 STC 정격에서 나온다
     expect(dcOut.v).toBeNull();
     expect(dcOut.i).toBeNull();
     expect(dcOut.notes.join(" ")).toContain("pv_imp_a");
+    expect(report.iv).toBeNull();
+  });
+
+  it("정격이 채워진 모듈은 DC 전압·전류와 곡선이 나온다", () => {
+    const t = composeTopology(tpl("qcells-qhome")).topology;
+    const g = buildRenderGraph(t, devices, ["power"]);
+    const flow = computePowerFlow(g, OP, { scenario: scenarios.find((s) => s.id === "grid_normal")! });
+    const report = nodeSignals(g, "pv-01", flow, OP);
+    const dcOut = report.ports.find((p) => p.port_id === "dc_out")!;
+    expect(dcOut.v).not.toBeNull();
+    expect(dcOut.i).not.toBeNull();
+    expect(report.iv).not.toBeNull();
   });
 });
 

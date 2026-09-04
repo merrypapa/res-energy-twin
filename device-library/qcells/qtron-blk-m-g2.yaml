@@ -8,12 +8,12 @@ ratings:
   module_efficiency_pct: 22.5
   pv_temp_coeff_pmax_pct_per_c: -0.3
   pv_temp_coeff_voc_pct_per_c: -0.24
-  # 아래 네 값은 데이터시트 표(STC)에 있으나 이 환경에서 PDF를 열 수 없어 채우지 않았다.
-  # 추정치를 넣지 않는다 — 값이 없으면 신호 엔진이 DC 전압·전류를 계산하지 않고 그 사실을 알린다.
-  pv_vmp_v: null
-  pv_imp_a: null
-  pv_voc_v: null
-  pv_isc_a: null
+  # STC 전기 정격 — 데이터시트 Electrical Characteristics 표의 440 W 클래스 열.
+  # 검산: Vmp × Imp = 33.33 × 13.20 = 439.96 W ≈ Pmpp 440 W
+  pv_vmp_v: 33.33
+  pv_imp_a: 13.20
+  pv_voc_v: 39.88
+  pv_isc_a: 13.90
 ports:
   - { id: dc_in, type: dc_pv_module, direction: in }
   - { id: dc_out, type: dc_pv_module, direction: out }
@@ -28,7 +28,18 @@ sources:
     date: "2026-09-03"
     note: >-
       108셀 N형 TOPCon(Q.ANTUM NEO), 모듈 효율 최대 22.5%, 415–440 Wp,
-      1722 × 1134 × 30 mm / 21.2 kg, 온도계수 PMax −0.3%/°C · Voc −0.24%/°C.
-      Vmp/Imp/Voc/Isc는 PDF 원문 열람이 차단되어 확인하지 못했다
+      1722 × 1134 × 30 mm / 21.2 kg, 온도계수 PMax −0.3%/°C · Voc −0.24%/°C
+  - ref: "같은 데이터시트 Electrical Characteristics 표 (440 W 클래스) — 사용자가 제공한 지면 이미지에서 전사"
+    url: "https://us.qcells.com/wp-content/uploads/2024/08/Qcells_Data_sheet_Q.TRON_BLK_M-G2_series_415-440_2024-08_Rev04_NA.pdf"
+    date: "2026-09-04"
+    note: >-
+      STC(1000 W/m², 25±2°C, AM1.5) 440 W 클래스: Pmpp 440 W · Isc 13.90 A ·
+      Voc 39.88 V · Impp 13.20 A · Vmpp 33.33 V · 효율 ≥22.5%.
+      NMOT(800 W/m², AM1.5) 같은 클래스: Pmpp 333.3 W · Isc 11.20 A · Voc 37.84 V ·
+      Impp 10.38 A · Vmpp 32.11 V — 스키마에 NMOT 필드가 없어 여기 기록만 해 둔다.
+      측정 공차 Pmpp ±3%, Isc·Voc ±5%.
+      전사한 지면의 표에는 420~440 클래스만 있었다(파일명·기존 출처 표기는 415–440)
 todos:
-  - "데이터시트 원문에서 STC 전기 정격(Vmp/Imp/Voc/Isc)을 채울 것 — 채우기 전까지 이 모듈의 DC 신호는 계산되지 않는다"
+  - "전사한 값이라 PDF 원문과 한 번 더 대조할 것 (Pmpp 검산은 통과: 33.33 × 13.20 = 439.96 W)"
+  - "NMOT 정격을 담을 스키마 필드를 둘지 결정. 지금은 sources 주석에만 있다"
+  - "415 W 클래스가 이 시리즈에 실제로 있는지 확인 — 전사한 표에는 420~440만 있었다"

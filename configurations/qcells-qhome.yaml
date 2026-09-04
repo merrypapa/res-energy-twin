@@ -29,7 +29,7 @@ options:
     choices:
       - value: qcells-qtron-blk-m-g2
         label: Q.TRON BLK M-G2+ 440
-        note: "Q.TRON AC의 모듈 부분. STC 전기 정격이 미입력이라 DC 전압·전류는 계산되지 않는다"
+        note: "Q.TRON AC의 모듈 부분. STC 정격이 들어와 있어 DC 전압·전류와 I–V 곡선이 계산된다"
       - value: generic-pv-module-400w
         label: PV 모듈 400W (모델링 기준)
         note: "전기 정격이 들어 있어 DC 전압·전류까지 계산된다"

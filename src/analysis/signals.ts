@@ -224,7 +224,7 @@ function ivCurve(node: RGNode, irradiance: number): IvCurve | null {
     mpp: { v: vmp, i: imp, p: vmp * imp },
     voc,
     isc,
-    model: "4파라미터 지수 근사 (실측 곡선 아님)",
+    model: "4파라미터 지수 근사 (실측 곡선 아님) · 일사에 전류만 비례, Vmp·Voc는 STC 값 고정",
   };
 }
 
