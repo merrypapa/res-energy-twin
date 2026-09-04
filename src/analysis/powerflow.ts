@@ -35,6 +35,12 @@ export interface PowerFlowResult {
   curtailed_kw: number;
   /** 인버터 AC 정격에서 잘린 PV(kW). DC/AC 비가 1을 넘으면 여기서 손실이 난다 */
   clipped_kw: number;
+  /**
+   * PV 원천 노드 ref → MPP 대비 실제로 뽑은 비율(1이면 MPP 그대로).
+   * 클리핑·아일랜드 제한이 걸리면 어레이는 MPP에서 물러난다. 그 사실을 노드 신호가
+   * 알아야 DC 동작점을 곡선 위 어디에 찍을지 정할 수 있다.
+   */
+  dc_scale: Readonly<Record<string, number>>;
   findings: Finding[];
 }
 
@@ -345,8 +351,10 @@ export function computePowerFlow(
     }
   }
 
+  const dcScale: Record<string, number> = {};
   for (const p of pvPaths) {
     const clip = p.inverter ? (clipScale.get(p.inverter) ?? 1) : 1;
+    dcScale[p.ref] = clip * scale;
     pvAtLoad += pushAlong(graph, p.path, p.ref, p.kw * clip * scale, op.inverter_efficiency, edges);
   }
 
@@ -414,6 +422,7 @@ export function computePowerFlow(
     grid_kw: gridKw,
     curtailed_kw: curtailed,
     clipped_kw: clipped,
+    dc_scale: dcScale,
     findings,
   };
 }

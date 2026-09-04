@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { parseHash, toHash, type UiState } from "../src/ui/urlState.js";
 import { EMPTY_SITE, SiteContext } from "../src/schema/rule.js";
@@ -102,6 +103,24 @@ describe("URL 상태 — 백엔드가 없으므로 링크가 곧 저장이다", 
     expect(h).not.toContain("sc=");
     expect(h).not.toContain("trip=");
     expect(h).not.toContain("load=");
+  });
+});
+
+describe("화면이 계산 결과를 버리지 않는다", () => {
+  // 렌더 테스트 환경(DOM)이 없으므로 소스 계약으로 지킨다 — 계산이 내놓은 동작점을
+  // 화면이 조용히 무시하면 "클리핑을 반영했다"는 말만 남고 보이는 것은 그대로다.
+  const chart = readFileSync("src/ui/SignalChart.tsx", "utf8");
+
+  it("클리핑 동작점(iv.op)을 I–V·P–V 그래프가 실제로 찍는다", () => {
+    expect(chart).toContain("iv.op");
+    // 두 그래프 모두에 넘어가야 한다.
+    expect(chart.match(/iv\.op/g)?.length ?? 0).toBeGreaterThanOrEqual(4);
+  });
+
+  it("MPP와 동작점을 색이 아니라 채움으로 구분한다 — 색은 활선/사선만 나른다(§6)", () => {
+    expect(chart).toContain("hollow");
+    const css = readFileSync("src/ui/styles.css", "utf8");
+    expect(css).toContain(".marker-hollow");
   });
 });
 

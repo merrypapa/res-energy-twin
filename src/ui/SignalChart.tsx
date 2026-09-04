@@ -9,14 +9,22 @@ import type { IvCurve, Waveform } from "../analysis/signals.js";
 
 const W = 320;
 
+/** 그래프 위의 점. hollow면 속이 빈 원 — 색으로 구분하지 않는다(§6). */
+interface Marker {
+  x: number;
+  y: number;
+  label: string;
+  hollow?: boolean;
+}
+
 interface PlotProps {
   x: number[];
   y: number[];
   title: string;
   unit: string;
   height?: number;
-  /** 표시할 점 (MPP 등) */
-  marker?: { x: number; y: number; label: string } | null;
+  /** 표시할 점 (MPP 등). 두 개 이상이면 라벨이 겹치지 않게 위아래로 어긋난다. */
+  marker?: Marker | Marker[] | null;
   /** x축 라벨 (왼쪽/오른쪽) */
   xLabels?: [string, string];
 }
@@ -31,6 +39,7 @@ function fmt(n: number): string {
 
 export function LinePlot({ x, y, title, unit, height = 72, marker = null, xLabels }: PlotProps) {
   if (x.length === 0 || y.length === 0) return null;
+  const markers: Marker[] = marker === null ? [] : Array.isArray(marker) ? marker : [marker];
   const padL = 4;
   const padR = 4;
   const top = 12;
@@ -63,14 +72,23 @@ export function LinePlot({ x, y, title, unit, height = 72, marker = null, xLabel
       <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} role="img" aria-label={title}>
         <path className="plot-axis" d={`M ${padL} ${zeroY} L ${W - padR} ${zeroY}`} />
         <path className="trace" d={d} />
-        {marker && (
-          <>
-            <circle className="marker" cx={sx(marker.x)} cy={sy(marker.y)} r="3" />
-            <text className="plot-note" x={Math.min(sx(marker.x) + 6, W - 90)} y={sy(marker.y) - 5}>
-              {marker.label}
+        {markers.map((m, k) => (
+          <g key={k}>
+            <circle
+              className={m.hollow ? "marker marker-hollow" : "marker"}
+              cx={sx(m.x)}
+              cy={sy(m.y)}
+              r="3"
+            />
+            <text
+              className="plot-note"
+              x={Math.min(sx(m.x) + 6, W - 90)}
+              y={sy(m.y) + (k === 0 ? -5 : 11)}
+            >
+              {m.label}
             </text>
-          </>
-        )}
+          </g>
+        ))}
         {xLabels && (
           <>
             <text className="plot-note" x={padL} y={height - 2}>
@@ -100,6 +118,17 @@ export function WaveformChart({ wave }: { wave: Waveform }) {
 }
 
 export function IvChart({ iv }: { iv: IvCurve }) {
+  // 클리핑이 걸리면 MPP는 "갈 수 있었던 자리", op는 "실제로 선 자리"다. 둘 다 찍어야
+  // 얼마나 물러났는지가 보인다. MPP를 속 빈 원으로 두어 실제 동작점과 구분한다.
+  const mppHollow = iv.op !== null;
+  const ivMarkers = [
+    { x: iv.mpp.v, y: iv.mpp.i, label: `MPP ${fmt(iv.mpp.v)}V / ${fmt(iv.mpp.i)}A`, hollow: mppHollow },
+    ...(iv.op ? [{ x: iv.op.v, y: iv.op.i, label: `동작점 ${fmt(iv.op.v)}V / ${fmt(iv.op.i)}A` }] : []),
+  ];
+  const pvMarkers = [
+    { x: iv.mpp.v, y: iv.mpp.p, label: `MPP ${fmt(iv.mpp.p)} W`, hollow: mppHollow },
+    ...(iv.op ? [{ x: iv.op.v, y: iv.op.p, label: `동작점 ${fmt(iv.op.p)} W` }] : []),
+  ];
   return (
     <div className="waveform">
       <LinePlot
@@ -107,7 +136,7 @@ export function IvChart({ iv }: { iv: IvCurve }) {
         y={iv.i}
         title="I–V 곡선"
         unit="A"
-        marker={{ x: iv.mpp.v, y: iv.mpp.i, label: `MPP ${fmt(iv.mpp.v)}V / ${fmt(iv.mpp.i)}A` }}
+        marker={ivMarkers}
         xLabels={["0 V", `${fmt(iv.voc)} V (Voc)`]}
       />
       <LinePlot
@@ -115,9 +144,15 @@ export function IvChart({ iv }: { iv: IvCurve }) {
         y={iv.p}
         title="P–V 곡선"
         unit="W"
-        marker={{ x: iv.mpp.v, y: iv.mpp.p, label: `${fmt(iv.mpp.p)} W` }}
+        marker={pvMarkers}
         xLabels={["0 V", `${fmt(iv.voc)} V`]}
       />
+      {iv.op && (
+        <p className="plot-caption">
+          인버터 AC 정격에 걸려 MPP에서 물러났다. MPPT가 전압을 올려 출력을 줄인다 —
+          MPP 대비 {((iv.op.p / iv.mpp.p) * 100).toFixed(0)}%.
+        </p>
+      )}
       <p className="plot-caption">{iv.model}</p>
     </div>
   );

@@ -311,6 +311,7 @@ button, select, input { font: inherit; color: inherit; }
 .plot-axis { stroke: var(--rule-strong); stroke-width: 0.8; fill: none; }
 .trace { stroke: var(--ink); stroke-width: 1.4; fill: none; stroke-linejoin: round; }
 .marker { fill: var(--ink); }
+.marker-hollow { fill: var(--paper); stroke: var(--ink); stroke-width: 1; }
 .plot-note { font-size: 9.5px; fill: var(--ink-soft); }
 .waveform { margin-top: 8px; }
 .plot-caption { margin: 2px 0 0; font-size: 11px; color: var(--ink-soft); }

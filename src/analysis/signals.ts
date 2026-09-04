@@ -61,6 +61,11 @@ export interface IvCurve {
   i: number[];
   p: number[];
   mpp: { v: number; i: number; p: number };
+  /**
+   * 실제 동작점. 클리핑이나 아일랜드 제한으로 MPP에서 물러났을 때만 채워진다.
+   * null = MPP에서 그대로 뽑고 있다.
+   */
+  op: { v: number; i: number; p: number } | null;
   voc: number;
   isc: number;
   /** 곡선 산출에 쓴 모델 이름. 실측이 아니라는 사실을 화면에 그대로 띄운다. */
@@ -193,37 +198,77 @@ function waveform(vRms: number, iRms: number, hz: number, delivering: boolean): 
  * 모듈 I–V 곡선. 4파라미터 지수 근사다 — 실측 곡선도, 단일 다이오드 정해도 아니다.
  * 화면에 모델 이름을 함께 띄워 "이 곡선은 근사"라는 사실을 숨기지 않는다.
  */
-function ivCurve(node: RGNode, irradiance: number): IvCurve | null {
-  const r = node.device.ratings;
-  if (r.pv_voc_v === null || r.pv_isc_a === null || r.pv_vmp_v === null || r.pv_imp_a === null) return null;
-  const voc = r.pv_voc_v;
-  const isc = r.pv_isc_a * Math.max(irradiance, 0.001);
-  const vmp = r.pv_vmp_v;
-  const imp = r.pv_imp_a * Math.max(irradiance, 0.001);
-  const iscStc = r.pv_isc_a;
-  const impStc = r.pv_imp_a;
+interface IvModel {
+  voc: number;
+  vmp: number;
+  isc: number;
+  imp: number;
+  /** 곡선 위의 I(V). 0 ≤ V ≤ Voc */
+  iAt: (v: number) => number;
+}
 
-  const c2 = (vmp / voc - 1) / Math.log(1 - impStc / iscStc);
-  const c1 = (1 - impStc / iscStc) * Math.exp(-vmp / (c2 * voc));
+/**
+ * 곡선 모델을 한 곳에 둔다 — 그래프와 DC 동작점 계산이 서로 다른 곡선을 쓰면
+ * 화면의 점이 화면의 선 위에 있지 않게 된다.
+ */
+function ivModel(r: RGNode["device"]["ratings"], irradiance: number): IvModel | null {
+  if (r.pv_voc_v === null || r.pv_isc_a === null || r.pv_vmp_v === null || r.pv_imp_a === null) return null;
+  const g = Math.max(irradiance, 0.001);
+  const voc = r.pv_voc_v;
+  const vmp = r.pv_vmp_v;
+  const isc = r.pv_isc_a * g;
+  const imp = r.pv_imp_a * g;
+
+  const c2 = (vmp / voc - 1) / Math.log(1 - r.pv_imp_a / r.pv_isc_a);
+  const c1 = (1 - r.pv_imp_a / r.pv_isc_a) * Math.exp(-vmp / (c2 * voc));
+
+  return { voc, vmp, isc, imp, iAt: (v) => Math.max(0, isc * (1 - c1 * (Math.exp(v / (c2 * voc)) - 1))) };
+}
+
+/**
+ * 출력을 목표치까지 줄일 때 MPPT가 잡는 동작점.
+ *
+ * MPP 오른쪽(고전압·저전류) 가지에서 찾는다. 인버터가 상단을 자르면 MPPT는 전압을
+ * 올려 어레이를 MPP에서 물러나게 한다 — 전류를 줄이는 쪽으로 내려가면 같은 전력을
+ * 내는 점이 두 개라 동작이 불안정해진다. 이분법이라 해석해가 아니라 수치해다.
+ */
+function curtailedPoint(m: IvModel, targetW: number): { v: number; i: number; p: number } {
+  let lo = m.vmp;
+  let hi = m.voc;
+  for (let k = 0; k < 60; k++) {
+    const mid = (lo + hi) / 2;
+    if (mid * m.iAt(mid) > targetW) lo = mid;
+    else hi = mid;
+  }
+  const v = (lo + hi) / 2;
+  const i = m.iAt(v);
+  return { v, i, p: v * i };
+}
+
+function ivCurve(node: RGNode, irradiance: number, dcScale: number): IvCurve | null {
+  const m = ivModel(node.device.ratings, irradiance);
+  if (m === null) return null;
 
   const v: number[] = [];
   const i: number[] = [];
   const p: number[] = [];
   const steps = 60;
   for (let k = 0; k <= steps; k++) {
-    const vk = (voc * k) / steps;
-    const ik = Math.max(0, isc * (1 - c1 * (Math.exp(vk / (c2 * voc)) - 1)));
+    const vk = (m.voc * k) / steps;
+    const ik = m.iAt(vk);
     v.push(vk);
     i.push(ik);
     p.push(vk * ik);
   }
+  const mppP = m.vmp * m.imp;
   return {
     v,
     i,
     p,
-    mpp: { v: vmp, i: imp, p: vmp * imp },
-    voc,
-    isc,
+    mpp: { v: m.vmp, i: m.imp, p: mppP },
+    op: dcScale < 0.999 ? curtailedPoint(m, mppP * dcScale) : null,
+    voc: m.voc,
+    isc: m.isc,
     model: "4파라미터 지수 근사 (실측 곡선 아님) · 일사에 전류만 비례, Vmp·Voc는 STC 값 고정",
   };
 }
@@ -342,6 +387,8 @@ export function nodeSignals(
       const module = dcSourceModule(graph, node, attached);
       const imp = module?.device.ratings.pv_imp_a ?? null;
       const vmp = module?.device.ratings.pv_vmp_v ?? null;
+      /** MPP 대비 실제로 뽑는 비율. 클리핑이 걸리면 1보다 작다. */
+      const dcScale = module ? (flow.dc_scale[module.ref] ?? 1) : 1;
       /** 이 포트에 물린 스트링 수. 병렬이면 전압은 그대로고 전류가 배로 늘어난다. */
       const parallel = attached.length;
       if (parallel === 0) {
@@ -355,22 +402,45 @@ export function nodeSignals(
           where: ref,
         });
       } else {
-        i = imp * op.irradiance * parallel;
+        // MPP에서 뽑을 때의 값. 클리핑이 걸리면 아래에서 곡선 위 동작점으로 옮긴다.
+        const iMpp = imp * op.irradiance * parallel;
+        i = iMpp;
         formulas.push({
           label: "스트링 전류",
           expr:
             parallel > 1
-              ? `I = n_병렬 · I_mp · G/1000 = ${parallel} × ${fmt(imp)} A × ${fmt(op.irradiance)} = ${fmt(i)} A ` +
+              ? `I = n_병렬 · I_mp · G/1000 = ${parallel} × ${fmt(imp)} A × ${fmt(op.irradiance)} = ${fmt(iMpp)} A ` +
                 `(병렬이면 전류가 더해지고 전압은 그대로다)`
-              : `I ≈ I_mp · G/1000 = ${fmt(imp)} A × ${fmt(op.irradiance)} = ${fmt(i)} A (직렬 회로에서 전류는 어디서나 같다)`,
+              : `I ≈ I_mp · G/1000 = ${fmt(imp)} A × ${fmt(op.irradiance)} = ${fmt(iMpp)} A (직렬 회로에서 전류는 어디서나 같다)`,
         });
         if (pKw !== null && i > 0) {
-          v = (Math.abs(pKw) * 1000) / i;
-          const series = Math.max(1, Math.round(v / vmp));
+          // 실린 전력은 이미 클리핑이 반영된 값이다. MPP 기준으로 되돌려야 직렬 수가 나온다.
+          const mppW = (Math.abs(pKw) * 1000) / Math.max(dcScale, 1e-6);
+          const series = Math.max(1, Math.round(mppW / iMpp / vmp));
+          v = series * vmp;
           formulas.push({
             label: "직렬 전압",
-            expr: `V = Σ V_mp = ${series} × ${fmt(vmp)} V = ${fmt(v, 1)} V (P/I로 되짚어도 같다)`,
+            expr: `V = Σ V_mp = ${series} × ${fmt(vmp)} V = ${fmt(v, 1)} V`,
           });
+
+          if (dcScale < 0.999 && module) {
+            // 인버터가 상단을 자르면 어레이는 MPP에 머무를 수 없다. MPPT가 전압을 올려
+            // 물러난 자리를 곡선에서 찾는다 — P/I로 되짚어 전압을 낮추면 방향이 거꾸로다.
+            const m = ivModel(module.device.ratings, op.irradiance);
+            if (m !== null) {
+              const pt = curtailedPoint(m, m.vmp * m.imp * dcScale);
+              v = pt.v * series;
+              i = pt.i * parallel;
+              formulas.push({
+                label: "클리핑 동작점",
+                expr:
+                  `상단이 잘려 MPP의 ${(dcScale * 100).toFixed(0)}%만 뽑는다. ` +
+                  `MPPT가 전압을 올려 물러난다: 모듈당 ${fmt(m.vmp)} V → ${fmt(pt.v)} V, ` +
+                  `${fmt(m.imp)} A → ${fmt(pt.i)} A`,
+              });
+              notes.push("인버터 AC 정격에 걸려 MPP가 아닌 곡선 위 동작점이다");
+            }
+          }
           basis.push(
             parallel > 1
               ? `직렬 ${series}장 × 병렬 ${parallel}스트링이 물린 지점이다`
@@ -416,7 +486,10 @@ export function nodeSignals(
     device_id: node.device.id,
     device_class: node.device.class,
     ports,
-    iv: node.device.class === "pv_module" ? ivCurve(node, op.irradiance) : null,
+    iv:
+      node.device.class === "pv_module"
+        ? ivCurve(node, op.irradiance, flow.dc_scale[node.ref] ?? 1)
+        : null,
     findings,
   };
 }

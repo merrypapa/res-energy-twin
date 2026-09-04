@@ -88,6 +88,29 @@ describe("AC 모듈 — 모듈 + 변환기를 나눠 그린다", () => {
     expect(at("mi-10") / at("mi-01")).toBeCloseTo(10, 1);
   });
 
+  it("변환기 AC 정격이 클리핑을 만든다 — 데이터시트 값이 신호에 나타난다", () => {
+    const full = OperatingPoint.parse({ irradiance: 1, house_load_kw: 3 });
+    const t = composeTopology(tpl("qcells-qhome")).topology;
+    const grid = scenarios.find((s) => s.id === "grid_normal")!;
+    const ownAc = (ds: typeof devices) => {
+      const g = buildRenderGraph(t, ds, ["power"]);
+      const flow = computePowerFlow(g, full, { scenario: grid });
+      // 트렁크 첫 유닛이라 ac_out은 누적 없이 자기 출력만 낸다.
+      return nodeSignals(g, "mi-01", flow, full).ports.find((p) => p.port_id === "ac_out")!.p_kw!;
+    };
+
+    const rated = dev("qcells-qtron-ac-microinverter").ratings.continuous_ac_kva!;
+    expect(ownAc(devices)).toBeCloseTo(rated, 3);
+
+    // 정격을 지우면 상한이 사라져 DC에서 온 만큼이 그대로 나온다 — 클리핑이 데이터에서 나온다.
+    const unrated = devices.map((d) =>
+      d.id === "qcells-qtron-ac-microinverter"
+        ? Device.parse({ ...d, ratings: { ...d.ratings, continuous_ac_kva: null } })
+        : d,
+    );
+    expect(ownAc(unrated)).toBeGreaterThan(rated);
+  });
+
   it("계통 추종이다 — 정전에서 스스로 아일랜드를 세우지 않는다", () => {
     const t = composeTopology(tpl("qcells-qhome"), { battery_units: 0 }).topology;
     const outage = evaluateScenario(t, devices, scenarios.find((s) => s.id === "outage_islanded")!);

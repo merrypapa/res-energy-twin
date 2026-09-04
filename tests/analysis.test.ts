@@ -248,9 +248,19 @@ describe("인버터 클리핑", () => {
   });
 
   it("AC 정격이 없으면 자르지 않고 그 사실을 경고한다", () => {
-    const f = at("qcells-qhome", 1.0);
+    // 어느 제품이 미기재인지에 매지 않는다 — 정격을 지운 사본으로 본다.
+    const stripped = devices.map((d) =>
+      d.id === "qcells-qtron-ac-microinverter"
+        ? Device.parse({ ...d, ratings: { ...d.ratings, continuous_ac_kva: null } })
+        : d,
+    );
+    const tpl = templates.find((t) => t.id === "qcells-qhome")!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, stripped, ["power", "comms"]);
+    const f = computePowerFlow(g, OperatingPoint.parse({ irradiance: 1, house_load_kw: 2 }), {});
     expect(f.clipped_kw).toBe(0);
     expect(f.findings.some((x) => x.code === "P031")).toBe(true);
+    // 정격이 있으면 같은 구성이 잘린다 — P031은 데이터 공백을 알리는 것이지 면제가 아니다.
+    expect(at("qcells-qhome", 1.0).clipped_kw).toBeGreaterThan(0);
   });
 });
 
@@ -342,8 +352,29 @@ describe("모듈 I–V · MPPT", () => {
   });
 
   it("정격이 채워졌으므로 DC 단자에 전압·전류가 나온다", () => {
-    const dc = at(1.0).ports.find((p) => p.port_id === "dc_out")!;
+    // 0.5 일사에서는 인버터가 자르지 않으므로 MPP 그대로다.
+    const dc = at(0.5).ports.find((p) => p.port_id === "dc_out")!;
     expect(dc.v).toBeCloseTo(33.33, 2);
-    expect(dc.i).toBeCloseTo(13.2, 2);
+    expect(dc.i).toBeCloseTo(13.2 * 0.5, 2);
+  });
+
+  it("클리핑이 걸리면 MPP가 아니라 곡선 오른쪽으로 물러난 점을 찍는다", () => {
+    const r = at(1.0);
+    const dc = r.ports.find((p) => p.port_id === "dc_out")!;
+    const iv = r.iv!;
+    expect(iv.op).not.toBeNull();
+    // MPPT는 전압을 올려 물러난다 — 전류를 줄이며 내려가는 것이 아니다.
+    expect(dc.v!).toBeGreaterThan(iv.mpp.v);
+    expect(dc.i!).toBeLessThan(iv.mpp.i);
+    expect(dc.v!).toBeLessThan(iv.voc);
+    // V·I가 실제 실린 전력과 맞는다.
+    expect(dc.v! * dc.i!).toBeCloseTo(Math.abs(dc.p_kw!) * 1000, 1);
+    // 동작점이 곡선 위에 있다 — 그래프의 점이 그래프의 선 밖에 있으면 안 된다.
+    expect(iv.op!.i).toBeCloseTo(dc.i!, 3);
+    expect(iv.op!.p).toBeLessThan(iv.mpp.p);
+  });
+
+  it("자르지 않을 때는 동작점을 따로 찍지 않는다 — MPP가 곧 동작점이다", () => {
+    expect(at(0.5).iv!.op).toBeNull();
   });
 });
