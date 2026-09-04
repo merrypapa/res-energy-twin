@@ -22,7 +22,7 @@ internals:
         note: "정격 미확인 — 제품명의 80이 모선 정격인지 확인 대상" }
     - { id: pv_breakers, display_name: PV 분기 차단기, kind: breaker, port: pv_ac_in,
         ocpd_a: null, count: 4,
-        note: "매뉴얼의 'PV 회로 최대 4계통'에서 도출한 자리 수다. 정격은 미확인" }
+        note: "AC 모듈 데이터시트가 'Q.HOME COMBINER CB : Max 4'로 4자리를 직접 적는다. 정격은 여전히 미확인" }
     - { id: batt_breaker, display_name: 축전지 분기 차단기, kind: breaker, port: battery_ac,
         ocpd_a: null, count: null, note: "자리 수·정격 미확인" }
     - { id: main_breaker, display_name: 메인 차단기, kind: breaker, port: main_ac,
@@ -41,8 +41,14 @@ internals:
       note: >-
         'PV 회로 최대 4계통', 'AC 모듈 최대 44장', '소비 계량용 200 A 클램프형 CT 1쌍'에서
         도출한 골격이다. 함체 내부 결선도를 대조한 것이 아니다
+    - ref: "Qcells Q.TRON AC MODULE 415-440 데이터시트 AC Output 표 — 사용자가 제공한 지면 이미지에서 전사"
+      url: "https://us.qcells.com/wp-content/uploads/2024/09/Qcells_Data_sheet_Q.TRON_AC_MODULE_series_415-440_2024-08_Rev03_NA.pdf"
+      date: "2026-09-04"
+      note: >-
+        'Q.HOME COMBINER CB : Max 4'. PV 분기 차단기 4자리가 매뉴얼의 회로 수와
+        별개 문서에서 같은 값으로 나온다 — 정격(A)은 어느 쪽에도 없다
   todos:
-    - "차단기 총 개수와 각 정격을 매뉴얼 내부 결선도로 확인할 것. 현재는 포트 구성에서 도출한 자리 수다"
+    - "차단기 정격(A)을 매뉴얼 내부 결선도로 확인할 것. 자리 수 4는 두 문서가 일치하나 정격은 어느 쪽에도 없다"
     - "축전지 분기가 몇 자리인지 확인 (battery_ac 포트는 최대 4연결이나 차단기 수와 같은지 미확인)"
     - "모선 정격 확인 — 제품명의 80이 무엇을 가리키는지 포함"
 sources:

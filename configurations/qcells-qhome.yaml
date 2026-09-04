@@ -40,7 +40,7 @@ options:
     choices:
       - value: qcells-qtron-ac-microinverter
         label: Q.TRON AC 내장 마이크로인버터
-        note: "모듈과 한 함체다. 변환기 정격은 확인 전이다"
+        note: "모듈과 한 함체다. 변환기는 Q.MI.349B-G1 — 연속 349 VA · 피크 366 VA · CEC 97%"
       - { value: enphase-iq8m, label: "Enphase IQ8M (325 VA)" }
   - id: battery_device
     label: 축전지 모델
@@ -63,7 +63,11 @@ options:
     max: 22
     default: 10
     unit: "장"
-    note: "결합반 PV 회로는 최대 4계통이다. 분기당 최대 유닛 수는 매뉴얼 확인 전이다"
+    note: >-
+      결합반 PV 회로는 최대 4계통이다. 분기당 유닛 상한은 제품마다 다르므로
+      여기서 막지 않고 R070이 선택된 마이크로인버터의 정격으로 판정한다
+      (Q.TRON AC는 20 A (L-L) 분기 기준 11대)
+
   - id: battery_units
     label: Q.HOME CORE 대수
     kind: int
