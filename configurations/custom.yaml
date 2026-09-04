@@ -86,7 +86,7 @@ options:
     choices:
       - { value: enphase-iq-battery-5p, label: "Enphase IQ Battery 5P (5.0 kWh · 3.84 kVA)" }
       - { value: enphase-iq-battery-10c, label: "Enphase IQ Battery 10C (10 kWh · 7.08 kVA)" }
-      - { value: qcells-qhome-core-g3, label: "Qcells Q.HOME CORE G3 (13.1 kWh · 7.6 kW)" }
+      - { value: qcells-qhome-core-g3, label: "Qcells Q.HOME CORE G3 (총 13.12 kWh · 가용 12.46 · 7.6 kW)" }
   - id: dc_battery_device
     label: DC 결합 ESS
     kind: enum

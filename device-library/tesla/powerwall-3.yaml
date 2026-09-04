@@ -35,3 +35,4 @@ todos:
   - "ac_out ocpd_a 60A는 11.5kW/240V 연속전류 기준 산출값. 매뉴얼 명시값과 대조 필요"
   - "comms_local 실제 매체(유선 RS485/무선) 확인 — 현재 proprietary로 임시 분류"
   - "grid_forming=true는 whole_home 백업 구성에서 유일한 AC 소스라는 데이터로부터 도출. 매뉴얼 문구로 재확인 필요"
+  - "LRA 185A가 실효값인지 첨두값인지 원문 확인 — 스키마상 ratings.lra는 실효값이고 R040이 그렇게 비교한다. 첨두값이면 자리를 lra_peak_a로 옮겨야 한다 (Q.HOME CORE G3는 44.3A 실효 / 62.7A 첨두로 둘을 나눠 적는다)"

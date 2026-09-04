@@ -47,7 +47,7 @@ options:
     kind: enum
     default: qcells-qhome-core-g3
     choices:
-      - { value: qcells-qhome-core-g3, label: "Q.HOME CORE G3 (13.1 kWh · 7.6 kW)" }
+      - { value: qcells-qhome-core-g3, label: "Q.HOME CORE G3 (총 13.12 kWh · 가용 12.46 · 7.6 kW)" }
   - id: pv_modules
     label: 모듈 수
     kind: int
@@ -75,7 +75,7 @@ options:
     max: 2
     default: 1
     unit: "대"
-    note: "HUB G3 + CORE G3 2대 구성에서 26.24 kWh"
+    note: "HUB G3 + CORE G3 2대 구성에서 총 26.24 kWh (= 2 × 13.12). 실제로 꺼내 쓰는 양은 가용 기준 24.92 kWh다"
 
 nodes:
   - { ref: svc, device: generic-utility-service-200a, label: 유틸리티 서비스 }

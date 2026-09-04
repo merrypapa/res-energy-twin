@@ -4,9 +4,19 @@ display_name: Q.HOME CORE G3 (A7.6B13.1)
 class: ac_battery
 status: draft
 ratings:
-  usable_energy_kwh: 13.1
-  continuous_ac_kw: 7.6            # 백업 출력
-  lra: null                        # TODO
+  # 1대 기준이다. 데이터시트의 오른쪽 열(15.2/15.2)은 CORE G3 2대 시스템 값이라
+  # 여기 넣지 않는다 — 대수는 토폴로지가 센다.
+  usable_energy_kwh: 12.46         # DoD 95%
+  total_energy_kwh: 13.12          # 셀 총량. 백업 시간 계산에 쓰지 않는다
+  continuous_ac_kw: 7.6
+  continuous_ac_kva: 7.6           # 데이터시트가 kVA/kW를 같은 수로 적는다
+  peak_ac_kw: 10.64                # 오프그리드 10초 피크
+  peak_ac_kva: 10.64
+  max_continuous_ac_a: 31.7        # @240 Vac
+  lra: 44.3                        # Load Start Capability, 실효값
+  lra_peak_a: 62.7                 # 같은 항목의 첨두값
+  cec_efficiency_pct: 97
+  round_trip_efficiency_pct: 89.7
 ports:
   - { id: ac_out, type: ac_240v_split, direction: bidirectional }
   - { id: comms, type: comms_proprietary, direction: bidirectional }
@@ -15,7 +25,7 @@ grid_forming: true                 # HUB G3와 함께 오프그리드 운전을 
 black_start_capable: null
 requires_one_of: [qcells-qhome-hub-g3]
 needs_backup_subpanel: "no"
-certifications: []
+certifications: [UL1741, UL3141, UL9540, UL9540A, UL1973, UN38.3, IEEE1547, IEEE2030.5, "IEEE693-2018"]
 utility_approval: null
 internals:
   blocks:
@@ -47,7 +57,24 @@ sources:
       AC 결합 ESS. 13.1 kWh에서 시작해 Q.HOME HUB G3 + CORE G3 2대 구성 시 26.24 kWh까지.
       백업 출력 7.6 kW, LG에너지솔루션 LFP 셀, 15년 보증.
       모델명 A7.6B13.1의 A/B가 각각 AC 출력(kW)과 축전 용량(kWh)을 가리킨다
+  - ref: "Q.HOME CORE G3 데이터시트 GRID DATA / BACKUP POWER OUTPUT / BATTERY UNIT 표 — 사용자가 제공한 지면 이미지에서 전사"
+    url: "https://media.qcells.com/v/dFcDJcaF/"
+    date: "2026-09-04"
+    note: >-
+      1대 기준: 최대 피상/정격 출력 7.6 kVA/7.6 kW · 공칭 240 V(211~264, L1-L2) ·
+      60 Hz · 최대 연속 전류 31.7 A @240 Vac · 역률 범위 -0.8~0.8 · CEC 효율 97% ·
+      왕복 효율 89.7% · 계통 형식 1P2W.
+      백업: 정격 7.6 kVA/7.6 kW · Load Start Capability LRA_RMS 44.3 A, LRA_Peak 62.7 A ·
+      오프그리드 10초 피크 10.64 kVA/10.64 kW · 계통 상실 절체 시간 약 250 ms · 240 V/60 Hz.
+      축전지: LFP(LG에너지솔루션) · 총 13.12 kWh · 사용 가능 12.46 kWh(DoD 95%) ·
+      최대 연속 방전 7.83 kW(DC 기준, AC 정격 7.6 kW와 다른 수다) ·
+      정격 전압 231.8 V(180~262.8).
+      표의 오른쪽 열(15.2 kVA · 26.24 kWh · LRA 88.7/125.4 A)은 CORE G3 2대 시스템 값이다.
+      각주: 'Split phase is created with Q.HOME HUB G3' — 분상은 CORE 단독이 아니라
+      HUB G3가 만든다
 todos:
-  - "LRA(모터 기동) 정격 확인"
-  - "grid_forming=true는 HUB G3 조합의 오프그리드 운전 표기에서 도출했다. 매뉴얼 문구로 재확인 필요"
-  - "2대 병렬 시 연속 출력이 합산되는지 확인 (26.24 kWh는 용량 기준 표기다)"
+  - "전사한 값이라 PDF 원문과 한 번 더 대조할 것"
+  - "grid_forming=true 재확인 — 데이터시트 각주는 분상을 HUB G3가 만든다고 적는다. 전압·주파수를 세우는 주체가 CORE인지 HUB인지 매뉴얼 문구로 가릴 것"
+  - "2대 병렬 시 연속 출력이 합산되는지 확인 (데이터시트 오른쪽 열이 7.6→15.2로 정확히 2배이나, 표기가 시스템 합계인지 보증값인지 미확인)"
+  - "DC측 최대 연속 방전 7.83 kW를 담을 필드가 없다 — 필요해지면 스키마에 낼 것"
+  - "인증 목록은 데이터시트 표기를 슬러그로 옮긴 것이다. 인증서 번호까지 대조하지 않았다"
