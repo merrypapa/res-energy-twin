@@ -35,10 +35,20 @@ describe("함체 내부 데이터", () => {
     expect(blocks.some((b) => b.kind === "busbar")).toBe(true);
   });
 
-  it("확인되지 않은 개수·정격은 null이다 — 추정해 넣지 않는다", () => {
-    const blocks = byId("qcells-qhome-combiner-80-g1").internals!.blocks;
-    for (const b of blocks.filter((x) => x.kind === "breaker")) {
-      expect(`${b.id}:${b.ocpd_a}`).toBe(`${b.id}:null`);
+  it("함체에 포함되지 않는 차단기는 정격을 비워 둔다 — 시공 시 정해지는 값이다", () => {
+    // 데이터시트가 '분기 차단기는 미포함, 현장 조달'이라 적는다. 자리마다 정격이 달라질
+    // 수 있으므로 하나의 수를 적으면 없는 사실을 만든다.
+    const dg = byId("qcells-qhome-combiner-80-g1").internals!.blocks.find((b) => b.id === "dg_breakers")!;
+    expect(dg.ocpd_a).toBeNull();
+    expect(dg.count).toBe(4);
+  });
+
+  it("정격을 적은 블록이 있으면 그 함체에 내부 출처가 붙어 있다", () => {
+    // 값이 데이터에 들어오는 것 자체는 막지 않는다. 막는 것은 근거 없이 들어오는 것이다.
+    for (const d of withInternals) {
+      const rated = d.internals!.blocks.filter((b) => b.ocpd_a !== null);
+      if (rated.length === 0) continue;
+      expect(`${d.id}:${d.internals!.sources.length > 0}`).toBe(`${d.id}:true`);
     }
   });
 

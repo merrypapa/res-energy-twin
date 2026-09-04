@@ -39,6 +39,7 @@ const RATING_ROWS: ReadonlyArray<readonly [keyof Device["ratings"], string, Fmt]
   ["pv_temp_coeff_pmax_pct_per_c", "온도계수 PMax", (v) => `${v} %/°C`],
   ["pv_temp_coeff_voc_pct_per_c", "온도계수 Voc", (v) => `${v} %/°C`],
   ["busbar_a", "버스바 정격", (v) => `${v} A`],
+  ["max_total_branch_ocpd_a", "분기 차단기 정격 합 상한", (v) => `${v} A`],
   ["main_ocpd_a", "메인 OCPD", (v) => `${v} A`],
   ["service_a", "서비스 정격", (v) => `${v} A`],
 ];

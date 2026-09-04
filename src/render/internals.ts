@@ -24,6 +24,7 @@ const KIND_LABEL: Record<string, string> = {
   converter: "변환",
   cells: "셀",
   breaker: "차단",
+  lug: "러그",
   busbar: "모선",
   meter: "계측",
   contactor: "접점",
