@@ -4,9 +4,13 @@ display_name: Q.HOME COMBINER 80 G1
 class: combiner
 status: draft
 ratings:
-  busbar_a: null            # TODO: 모선 정격 확인 (제품명의 80이 무엇을 가리키는지 포함)
+  busbar_a: 125                    # Eaton BR 시리즈 모선
+  max_continuous_ac_a: 64          # PV/축전지에서 들어오는 입력 기준
+  max_total_branch_ocpd_a: 80      # 분산전원 분기 차단기 정격의 합 상한. 제품명의 80이 이것이다
+  main_ocpd_a: null                # 주 접속은 러그다 — 이 함체에 메인 차단기가 없다
 ports:
-  # PV 스트링(=AC 모듈 분기회로) 최대 4회로
+  # 분산전원(태양광 또는 태양광+축전지) 분기는 최대 4자리다. 두 포트를 따로 두었으나
+  # 실제 한도는 두 포트의 합이 4다 — 스키마가 포트 합산 한도를 아직 표현하지 못한다(todos).
   - { id: pv_ac_in, type: ac_240v_split, direction: in, max_connections: 4 }
   - { id: battery_ac, type: ac_240v_split, direction: bidirectional, max_connections: 4 }
   - { id: main_ac, type: ac_240v_split, direction: bidirectional }
@@ -14,50 +18,78 @@ ports:
 provides_mid: false
 requires_one_of: []
 needs_backup_subpanel: "no"
-certifications: []
+certifications: [UL1741, CSA-C22.2-No.107, FCC-Part-15B, ANSI-C12.20, NEMA-3R, IEEE2030.5]
 utility_approval: null
 internals:
   blocks:
-    - { id: busbar, display_name: 모선, kind: busbar, port: null, ocpd_a: null,
-        note: "정격 미확인 — 제품명의 80이 모선 정격인지 확인 대상" }
-    - { id: pv_breakers, display_name: PV 분기 차단기, kind: breaker, port: pv_ac_in,
+    - { id: dg_breakers, display_name: 분산전원 분기 차단기, kind: breaker, port: pv_ac_in,
         ocpd_a: null, count: 4,
-        note: "AC 모듈 데이터시트가 'Q.HOME COMBINER CB : Max 4'로 4자리를 직접 적는다. 정격은 여전히 미확인" }
-    - { id: batt_breaker, display_name: 축전지 분기 차단기, kind: breaker, port: battery_ac,
-        ocpd_a: null, count: null, note: "자리 수·정격 미확인" }
-    - { id: main_breaker, display_name: 메인 차단기, kind: breaker, port: main_ac,
-        ocpd_a: null, note: "상류(HUB/패널) 연결. 정격 미확인" }
+        note: "2극 Eaton BR 시리즈 DG 전용, 4자리. 함체에 포함되지 않아 현장 조달이다 —
+               자리마다 정격이 달라질 수 있어 ocpd_a를 하나로 적지 않는다.
+               지원 품목 BR210/215/220/230/240/250/260, 합계 상한 80 A" }
+    - { id: busbar, display_name: 모선, kind: busbar, port: null, ocpd_a: 125,
+        note: "Eaton BR 시리즈 모선 125 A" }
+    - { id: gateway_breaker, display_name: 게이트웨이 차단기, kind: breaker, port: null,
+        ocpd_a: 15,
+        note: "Eaton BR215 15 A. 공장 조립되어 함체에 포함된다. 감시 보드로 가는 전원이다.
+               이것까지 세면 분기 차단기 합계 상한이 95 A가 된다" }
+    - { id: main_lug, display_name: 주 접속 러그, kind: lug, port: main_ac, ocpd_a: null,
+        note: "차단기가 아니라 러그다 — 이 함체 안에 메인 과전류 보호가 없다.
+               상류(HUB/패널)의 차단기가 보호한다. 도체 10~2/0 AWG 구리" }
+    - { id: prod_meter, display_name: 발전 계량기, kind: meter, port: null,
+        note: "Revenue Grade, ANSI C12.20-2015 0.5 정확도 등급. 사전 배선(add-on)" }
     - { id: ct, display_name: 소비 계량용 CT, kind: meter, port: comms, count: 2,
-        note: "200 A 클램프형 1쌍(정확도 ±0.5%). 전력 경로가 아니라 계측 신호다" }
+        note: "200 A 슬림 클램프형 1쌍, 정확도 ±2.0%. 전력 경로가 아니라 계측 신호다.
+               발전 계량기의 0.5 등급과 다른 수다 — 둘은 다른 계측이다" }
+    - { id: monitor, display_name: 감시·통신 보드, kind: controller, port: comms,
+        note: "Wi-Fi 802.11b/g/n · 셀룰러(LTE-CAT4) · 이더넷(선택). UL 61010-1 / 61010-2-030" }
   links:
-    - { from: pv_breakers, to: busbar, domain: ac }
-    - { from: batt_breaker, to: busbar, domain: ac }
-    - { from: busbar, to: main_breaker, domain: ac }
-    - { from: ct, to: busbar, domain: signal }
+    - { from: dg_breakers, to: busbar, domain: ac }
+    - { from: busbar, to: main_lug, domain: ac }
+    - { from: busbar, to: gateway_breaker, domain: ac }
+    - { from: gateway_breaker, to: monitor, domain: ac }
+    - { from: prod_meter, to: monitor, domain: signal }
+    - { from: ct, to: monitor, domain: signal }
   sources:
-    - ref: "Q.HOME COMBINER 80 G1 설치 매뉴얼"
-      url: "https://media.qcells.com/v/J5bKzFB8/"
-      date: "2026-09-03"
-      note: >-
-        'PV 회로 최대 4계통', 'AC 모듈 최대 44장', '소비 계량용 200 A 클램프형 CT 1쌍'에서
-        도출한 골격이다. 함체 내부 결선도를 대조한 것이 아니다
-    - ref: "Qcells Q.TRON AC MODULE 415-440 데이터시트 AC Output 표 — 사용자가 제공한 지면 이미지에서 전사"
-      url: "https://us.qcells.com/wp-content/uploads/2024/09/Qcells_Data_sheet_Q.TRON_AC_MODULE_series_415-440_2024-08_Rev03_NA.pdf"
+    - ref: "Q.HOME COMBINER 80 G1 데이터시트 Technical Specification — 사용자가 제공한 지면 이미지에서 전사"
+      url: "https://media.qcells.com/v/1nfz68QT/"
       date: "2026-09-04"
       note: >-
-        'Q.HOME COMBINER CB : Max 4'. PV 분기 차단기 4자리가 매뉴얼의 회로 수와
-        별개 문서에서 같은 값으로 나온다 — 정격(A)은 어느 쪽에도 없다
+        내부 구성을 도출이 아니라 근거로 바꾼 지면이다.
+        모선 125 A(Eaton BR) · 분기 4자리(2극 Eaton BR DG 전용, 미포함) ·
+        게이트웨이 차단기 15 A(Eaton BR215, 포함·사전 조립) ·
+        주 접속은 러그(10~2/0 AWG) · 발전 계량 ANSI C12.20-2015 0.5 등급(사전 배선) ·
+        소비 계량 200 A 클램프 CT 1쌍 ±2.0%
   todos:
-    - "차단기 정격(A)을 매뉴얼 내부 결선도로 확인할 것. 자리 수 4는 두 문서가 일치하나 정격은 어느 쪽에도 없다"
-    - "축전지 분기가 몇 자리인지 확인 (battery_ac 포트는 최대 4연결이나 차단기 수와 같은지 미확인)"
-    - "모선 정격 확인 — 제품명의 80이 무엇을 가리키는지 포함"
+    - "분기 차단기는 함체에 포함되지 않는다 — 실제 설치 정격은 시공 시 정해진다.
+       ocpd_a를 자리별로 담을 구조가 필요해지면 스키마에 낼 것"
+    - "발전 계량기가 모선의 어느 지점(분기 합류 전/후)을 재는지 결선도로 확인할 것"
+    - "감시 보드와 CT·계량기 사이 결선 매체(유선/무선) 확인"
 sources:
   - ref: "Q.HOME COMBINER 80 G1 설치 매뉴얼"
     url: "https://media.qcells.com/v/J5bKzFB8/"
     date: "2026-09-03"
     note: >-
-      PV 회로 최대 4계통, AC 모듈 최대 44장을 한 함체로 모은다.
-      소비 계량용 200 A 클램프형 CT 1쌍(정확도 ±0.5%) 지원
+      PV 회로 최대 4계통, AC 모듈 최대 44장을 한 함체로 모은다
+  - ref: "Q.HOME COMBINER 80 G1 데이터시트 Technical Specification — 사용자가 제공한 지면 이미지에서 전사"
+    url: "https://media.qcells.com/v/1nfz68QT/"
+    date: "2026-09-04"
+    note: >-
+      제조사 한화솔루션 · 보증 5년 · 생산국 베트남.
+      전기: 계통 120/240 VAC 60 Hz · 모선 125 A(Eaton BR) ·
+      최대 연속 입력 전류 64 A(PV/축전지) · 분기회로 2극 Eaton BR DG 4자리(미포함) ·
+      분기 차단기 정격 합 상한 80 A(게이트웨이 차단기 포함 시 95 A) ·
+      게이트웨이 차단기 Eaton BR215 15 A 포함.
+      기계: AC 모듈 최대 44장(11직렬 × 4스트링) — 외부 서브패널을 쓰면 144장까지 ·
+      14.6 × 19.3 × 6.3 in · 11.5 lb · 동작 -40~140 °F · 옥외 NEMA 3R ·
+      도체 20 A 분기 12~8 AWG, 주 러그 10~2/0 AWG, 중성/접지 8~6 AWG ·
+      자연 대류 냉각 · 고도 2,000 m까지.
+      지원 AC 모듈: Q.TRON BLK M-G2.XY+/AC, Q.PEAK DUO BLK ML-G10.XY+/AC.
+      지원 차단기: Eaton BR210, BR215(사전 조립), BR220, BR230, BR240, BR250, BR260
 todos:
-  - "모선·차단기 정격 확인. 제품명의 80이 정격 전류인지 확인"
-  - "CT는 계측 신호다 — ct_sense 포트로 분리할지 결정"
+  - "전사한 값이라 PDF 원문과 한 번 더 대조할 것"
+  - "분산전원 분기는 태양광과 축전지가 4자리를 나눠 쓴다.
+     지금은 pv_ac_in과 battery_ac에 각각 max_connections 4를 두어 합이 8까지 허용된다 —
+     포트 합산 한도를 스키마에 표현하고 검증기가 보게 할 것"
+  - "분기 차단기 정격 합 ≤ 80 A를 판정하는 룰이 없다. 차단기가 미포함이라
+     시공 시 정해지는 값이므로, 사이트 입력으로 받을지 결정할 것"
