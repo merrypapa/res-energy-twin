@@ -113,8 +113,16 @@ export const Ratings = z
     /** MPPT 입력 전압 창(V). 스트링 길이가 이 안에 들어와야 한다. */
     mppt_v_min: z.number().positive().nullable().default(null),
     mppt_v_max: z.number().positive().nullable().default(null),
-    /** 최대 연속 출력 전류(A). 도체·OCPD 산정의 근거다. */
+    /**
+     * 최대 연속 전류(A). 전원 장치에서는 출력, 결합반처럼 모으는 장치에서는 입력 기준이다.
+     * 어느 쪽인지는 device의 sources에 적는다. 도체·OCPD 산정의 근거다.
+     */
     max_continuous_ac_a: z.number().positive().nullable().default(null),
+    /**
+     * 분기 차단기 정격의 합에 걸리는 상한(A). 모선 정격과 다르다 —
+     * 모선이 견디는 값이 아니라, 이 함체에 물릴 수 있는 분산전원 총량의 한도다.
+     */
+    max_total_branch_ocpd_a: z.number().positive().nullable().default(null),
     /**
      * 한 분기회로에 물릴 수 있는 최대 유닛 수. 마이크로인버터처럼 트렁크에 여러 대가
      * 물리는 제품에서 제조사가 정하는 값이다. 분기 차단기 정격이 상한을 만든다.

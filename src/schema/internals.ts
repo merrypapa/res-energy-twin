@@ -13,6 +13,7 @@ export const InternalKind = z.enum([
   "converter",   // 인버터·PCS 등 변환부
   "cells",       // 축전지 셀 뭉치
   "breaker",     // 차단기 · 개폐기
+  "lug",         // 접속 러그. 차단기가 아니다 — 과전류 보호가 없다
   "busbar",      // 모선
   "meter",       // 계량·계측
   "contactor",   // 계통 분리 접점
