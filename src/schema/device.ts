@@ -67,13 +67,29 @@ export const Port = z.object({
 /** 모든 값은 nullable. 확인되지 않은 숫자를 추정해 채우지 않는다. */
 export const Ratings = z
   .object({
+    /**
+     * 실제로 꺼내 쓸 수 있는 에너지(kWh). 백업 지속 시간의 근거다.
+     * 총 에너지와 섞지 않는다 — DoD가 100%가 아니면 둘은 다른 수이며,
+     * 총량을 여기 넣으면 백업 시간이 그만큼 부풀려진다.
+     */
     usable_energy_kwh: z.number().positive().nullable().default(null),
+    /** 셀 총 에너지(kWh). 사용 가능 에너지와의 차가 DoD를 드러낸다. */
+    total_energy_kwh: z.number().positive().nullable().default(null),
     continuous_ac_kw: z.number().positive().nullable().default(null),
     continuous_ac_kva: z.number().positive().nullable().default(null),
     peak_ac_kw: z.number().positive().nullable().default(null),
     /** 피상전력 기준 피크 출력(kVA). kW와 섞지 않는다 — 역률 없이 환산하면 없는 정보를 만든다. */
     peak_ac_kva: z.number().positive().nullable().default(null),
+    /**
+     * 기동 부하 허용치(A, 실효값). 모터 명판 LRA가 실효값으로 주어지므로
+     * 판정은 이 값으로 한다.
+     */
     lra: z.number().positive().nullable().default(null),
+    /**
+     * 같은 항목의 피크(첨두)값(A). 실효값보다 크다 — 둘을 섞어 비교하면
+     * 기동 능력을 과대평가한다. 룰은 이 값으로 판정하지 않는다.
+     */
+    lra_peak_a: z.number().positive().nullable().default(null),
     pv_mppt_count: z.number().int().positive().nullable().default(null),
     max_pv_dc_kw: z.number().positive().nullable().default(null),
     busbar_a: z.number().positive().nullable().default(null),
@@ -92,6 +108,8 @@ export const Ratings = z
     pv_temp_coeff_voc_pct_per_c: z.number().negative().nullable().default(null),
     /** 인버터 CEC 가중 효율(%). 동작점의 효율 가정값과 대조된다. */
     cec_efficiency_pct: z.number().positive().nullable().default(null),
+    /** 축전지 왕복 효율(%). 충전에 넣은 에너지 중 다시 꺼내지는 비율이다. */
+    round_trip_efficiency_pct: z.number().positive().nullable().default(null),
     /** MPPT 입력 전압 창(V). 스트링 길이가 이 안에 들어와야 한다. */
     mppt_v_min: z.number().positive().nullable().default(null),
     mppt_v_max: z.number().positive().nullable().default(null),
