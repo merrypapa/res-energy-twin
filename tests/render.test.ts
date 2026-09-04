@@ -1,7 +1,9 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadDevices, loadPresetTopologies } from "../src/validate/index.js";
+import { loadDevices, loadPresetTopologies, loadConfigurations } from "../src/validate/index.js";
+import { composeTopology } from "../src/config/compose.js";
+import { GEO } from "../src/render/theme.js";
 import { layoutGraph, renderTopology, hasSymbol } from "../src/render/index.js";
 import { buildRenderGraph, RenderGraphError } from "../src/graph/index.js";
 import { DeviceClass, Device } from "../src/schema/device.js";
@@ -263,5 +265,79 @@ describe("배열 블록 — 한 화면에 들어오게 접는다", () => {
   it("배치는 여전히 결정론적이다", () => {
     const g = enphaseGraph();
     expect(JSON.stringify(layoutGraph(g))).toBe(JSON.stringify(layoutGraph(enphaseGraph())));
+  });
+});
+
+describe("AC 트렁크는 버스로 그린다", () => {
+  const qcells = () => {
+    const tpl = loadConfigurations("configurations").items.find((t) => t.id === "qcells-qhome")!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, devices, ["power", "comms"]);
+    return { g, layout: layoutGraph(g) };
+  };
+  const edgeOf = (l: ReturnType<typeof layoutGraph>, id: string) =>
+    l.edges.find((r) => r.edge.id === id)!;
+  const trunkEdges = (l: ReturnType<typeof layoutGraph>) =>
+    l.edges.filter((r) => /^mi-\d+\..*->mi-\d+\./.test(r.edge.id));
+
+  it("이웃한 마이크로인버터는 심볼끼리 직선으로 잇지 않는다", () => {
+    // 수평 2점 직선은 직렬로 읽힌다. 마이크로인버터는 서로 직렬이 아니다.
+    const { layout } = qcells();
+    const trunk = trunkEdges(layout);
+    expect(trunk.length).toBeGreaterThan(5);
+    for (const r of trunk) {
+      expect(`${r.edge.id}: ${r.points.length}점`).not.toBe(`${r.edge.id}: 2점`);
+    }
+  });
+
+  it("탭이 내려붙는 버스가 한 줄로 이어진다", () => {
+    const { layout } = qcells();
+    const trunk = trunkEdges(layout);
+    // 각 도체는 (탭 내림 · 버스 구간 · 탭 올림) 네 점이고, 가운데 두 점의 y가 버스다.
+    const busYs = new Set<number>();
+    for (const r of trunk) {
+      expect(r.points.length).toBe(4);
+      expect(r.points[1]!.y).toBe(r.points[2]!.y);
+      busYs.add(r.points[1]!.y);
+    }
+    // 행이 둘이므로 버스도 둘. 같은 행 안에서는 하나로 이어진다.
+    expect(busYs.size).toBe(2);
+  });
+
+  it("버스는 심볼 아래에 깔린다 — 심볼을 관통하지 않는다", () => {
+    const { g, layout } = qcells();
+    const r = trunkEdges(layout)[0]!;
+    const node = layout.nodes.find((n) => n.ref === r.edge.from.nodeRef)!;
+    expect(r.points[1]!.y).toBeGreaterThan(node.y + GEO.glyphCy);
+    expect(g.byRef.get(r.edge.from.nodeRef)!.device.class).toBe("microinverter");
+  });
+
+  it("결합반으로 가는 홈런은 버스에서 출발한다 — 트렁크와 끊어지지 않는다", () => {
+    const { layout } = qcells();
+    const trunkBusY = trunkEdges(layout).map((r) => r.points[1]!.y);
+    const home = layout.edges.filter(
+      (r) => /^mi-\d+\./.test(r.edge.id) && !/->mi-\d+\./.test(r.edge.id),
+    );
+    expect(home.length).toBeGreaterThan(0);
+    for (const r of home) {
+      expect(`${r.edge.id}: ${trunkBusY.includes(r.points[0]!.y)}`).toBe(`${r.edge.id}: true`);
+    }
+  });
+
+  it("DC 직렬 스트링은 여전히 수평 직선이다 — 실제로 직렬이기 때문", () => {
+    const tpl = loadConfigurations("configurations").items.find((t) => t.id === "solaredge-home-hub")!;
+    const g = buildRenderGraph(composeTopology(tpl, {}).topology, devices, ["power", "comms"]);
+    const l = layoutGraph(g);
+    const dcSameRow = l.edges.filter((r) => {
+      const a = l.nodes.find((n) => n.ref === r.edge.from.nodeRef)!;
+      const b = l.nodes.find((n) => n.ref === r.edge.to.nodeRef)!;
+      return (
+        Math.abs(a.y - b.y) < 1 &&
+        r.edge.from.port.type.startsWith("dc_") &&
+        r.edge.to.port.type.startsWith("dc_")
+      );
+    });
+    for (const r of dcSameRow) {
+      expect(`${r.edge.id}: ${r.points.length}점`).toBe(`${r.edge.id}: 2점`);
+    }
   });
 });

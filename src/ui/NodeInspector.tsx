@@ -9,6 +9,8 @@ import { ELECTRICAL_SOURCE } from "../schema/electrical.js";
 import type { Location } from "../schema/location.js";
 import type { DayProfile } from "../analysis/day.js";
 import { IvChart, LinePlot, WaveformChart } from "./SignalChart.js";
+import { renderInternals } from "../render/internals.js";
+import type { Device } from "../schema/device.js";
 import { ProductCard } from "./ProductSheet.js";
 import { TimeBar } from "./TimeBar.js";
 
@@ -123,14 +125,21 @@ export function NodeInspector({
         ))}
         {report.iv && (
           <div className="port-charts">
-            <p className="chart-caption">모듈 I–V · P–V</p>
+            <p className="chart-caption">
+              모듈 I–V · P–V — 최대출력점(MPP)은 일사에 따라 움직인다
+            </p>
             <IvChart iv={report.iv} />
           </div>
+        )}
+        {report.device_class === "pv_module" && report.iv === null && (
+          <MissingIv device={node.device} />
         )}
         {power.some((p) => p.domain === "dc" && p.p_kw !== null && p.waveform === null) && (
           <p className="hint">직류 지점은 파형이 없다 — 값이 시간에 따라 변하지 않는다.</p>
         )}
       </div>
+
+      <InternalsSection device={node.device} />
 
       {/* ── 아래는 설명 ─────────────────────────────────────── */}
       <div className="group">
@@ -270,6 +279,68 @@ function PortPanel({ port, focused }: { port: PortSignal; focused: boolean }) {
           {n}
         </p>
       ))}
+    </div>
+  );
+}
+
+/** I-V 곡선에 필요한 STC 값. 하나라도 없으면 곡선을 그리지 않는다. */
+const IV_FIELDS = [
+  ["pv_voc_v", "개방 전압 Voc"],
+  ["pv_isc_a", "단락 전류 Isc"],
+  ["pv_vmp_v", "최대출력 전압 Vmp"],
+  ["pv_imp_a", "최대출력 전류 Imp"],
+] as const;
+
+/**
+ * 곡선을 못 그리는 이유를 구체적으로 밝힌다.
+ *
+ * "정격이 없다"로 끝내면 무엇을 채워야 하는지 알 수 없다. 빠진 항목을 이름으로 대고
+ * 출처 링크를 함께 준다 — 값을 추정해 곡선을 만들어 내지는 않는다.
+ */
+function MissingIv({ device }: { device: Device }) {
+  const missing = IV_FIELDS.filter(([key]) => device.ratings[key] === null);
+  if (missing.length === 0) return null;
+  const sheet = device.sources.find((s) => s.url !== null);
+  return (
+    <p className="hint">
+      I–V · MPPT 곡선을 그리려면 STC 값 네 개가 필요하다. 지금 없는 것:{" "}
+      <b>{missing.map(([, label]) => label).join(" · ")}</b>. 추정해 그리지 않는다 —
+      데이터시트에서 채우면 바로 나온다.
+      {sheet && (
+        <>
+          {" "}
+          <a href={sheet.url!} target="_blank" rel="noreferrer noopener">
+            {sheet.ref}
+          </a>
+        </>
+      )}
+    </p>
+  );
+}
+
+/**
+ * 함체 내부. 단선도에는 한 상자로 그려지는 것의 안쪽이다 —
+ * 결합반의 차단기 구성처럼 상자 하나로는 보이지 않는 것을 여기서 연다.
+ */
+function InternalsSection({ device }: { device: Device }) {
+  const internals = device.internals;
+  if (internals === null) return null;
+  const svg = renderInternals(device);
+  if (svg === null) return null;
+  return (
+    <div className="group">
+      <h3>함체 내부</h3>
+      <div className="internals-sheet" dangerouslySetInnerHTML={{ __html: svg }} />
+      <p className="hint">
+        읽기 위한 기술이다 — 전력 조류와 코드 판정은 이 구조를 보지 않는다.
+      </p>
+      {internals.todos.length > 0 && (
+        <ul className="plain watch">
+          {internals.todos.map((t) => (
+            <li key={t}>확인 필요 — {t}</li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

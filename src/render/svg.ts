@@ -114,7 +114,12 @@ function renderNode(
 
   // 심볼 아래 남는 절반에 텍스트 덩어리를 세로 중앙 정렬한다.
   const blockH = labelLines.length * 15 + (metaText ? 13 : 0);
-  const textTop = box.y + box.h / 2 + (box.h / 2 - blockH) / 2;
+  // 트렁크 버스가 지나는 노드는 라벨을 버스 아래로 민다 — 글자를 도체가 관통하면 안 된다.
+  const onTrunk = layout.trunkRefs.includes(ref);
+  const textTop = Math.max(
+    box.y + box.h / 2 + (box.h / 2 - blockH) / 2,
+    onTrunk ? box.y + GEO.trunkBusY + 9 : 0,
+  );
 
   // 노드에는 배경판을 깔지 않는다 — 카드처럼 보이지 않게(CLAUDE.md §6).
   // 배치가 도체를 노드 위로 지나가게 하지 않으므로 가릴 것도 없다.

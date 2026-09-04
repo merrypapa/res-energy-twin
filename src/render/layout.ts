@@ -1,5 +1,6 @@
 import type { RenderGraph, RGEdge } from "../graph/index.js";
 import { isNarrow, symbolExtent, type DeviceClassName } from "./symbols.js";
+import { portElectrical } from "../schema/electrical.js";
 import { GEO } from "./theme.js";
 
 /**
@@ -50,6 +51,8 @@ export interface Layout {
   edges: RoutedEdge[];
   /** 노드가 차지하는 영역 */
   drawing: { x: number; y: number; w: number; h: number };
+  /** AC 트렁크 버스에 물린 노드. 라벨이 버스를 침범하지 않게 렌더러가 쓴다. */
+  trunkRefs: string[];
   width: number;
   /** 도면 영역 높이. 제목란은 포함하지 않는다 (svg.ts가 아래에 붙인다). */
   height: number;
@@ -404,11 +407,31 @@ export function layoutGraph(g: RenderGraph): Layout {
     const block = plan.blocks.get(key);
     if (!block || block.rows.length < 2) continue;
     if (rank.get(e.from.nodeRef) === rank.get(e.to.nodeRef)) continue;
+    // 마지막 행에서 나가는 도체는 아래로 가로지를 것이 없다 — 레인까지 돌아갈 이유가 없다.
+    const rowIndex = block.rows.findIndex((row) =>
+      row.some((cell) => cell.includes(e.from.nodeRef)),
+    );
+    if (rowIndex === block.rows.length - 1) continue;
     laneEdges.add(e.id);
   }
 
   const { layers, segments, chains, flat, layered } = buildLayers(g, plan, rank, laneEdges);
   orderLayers(layers, segments);
+
+  /**
+   * AC 트렁크에 물린 노드. 이 노드에서 랭크를 넘어 나가는 도체는 노드 바닥이 아니라
+   * 버스에서 출발해야 한다 — 그러지 않으면 트렁크와 홈런이 끊어져 보인다.
+   */
+  const onTrunk = new Set<string>();
+  for (const e of flat) {
+    if (
+      portElectrical(e.from.port.type).domain !== "ac" ||
+      portElectrical(e.to.port.type).domain !== "ac"
+    )
+      continue;
+    onTrunk.add(e.from.nodeRef);
+    onTrunk.add(e.to.nodeRef);
+  }
 
   // ── 크기 ────────────────────────────────────────────────────
   const widthOf = (it: Item): number => {
@@ -543,10 +566,13 @@ export function layoutGraph(g: RenderGraph): Layout {
     for (const [ref, list] of byNode) {
       const b = boxes.get(ref)!;
       const sorted = [...list].sort((a, c) => nextX(a, side === "out") - nextX(c, side === "out"));
+      const fromBus = side === "out" && onTrunk.has(ref);
       sorted.forEach((e, i) => {
         anchors.set(`${e.id}|${side}`, {
-          x: b.x + (b.w * (i + 1)) / (sorted.length + 1),
-          y: side === "out" ? b.y + b.h : b.y,
+          // 트렁크에 물린 노드는 버스에서 곧장 빠진다. 노드 바닥에서 시작하면
+          // 탭과 홈런이 따로 놀아 선이 끊어져 보인다.
+          x: fromBus ? b.x + b.w / 2 : b.x + (b.w * (i + 1)) / (sorted.length + 1),
+          y: side === "out" ? (fromBus ? b.y + GEO.trunkBusY : b.y + b.h) : b.y,
         });
       });
     }
@@ -599,9 +625,29 @@ export function layoutGraph(g: RenderGraph): Layout {
     const aCy = a.y + GEO.glyphCy;
     const bCy = b.y + GEO.glyphCy;
 
+    const acBoth =
+      portElectrical(e.from.port.type).domain === "ac" &&
+      portElectrical(e.to.port.type).domain === "ac";
+
     let points: Pt[];
-    if (Math.abs(aCy - bCy) < 1) {
-      // 같은 행 — 심볼 옆구리끼리 곧장 잇는다. 이 선이 수평이라는 것 자체가 정보다.
+    if (Math.abs(aCy - bCy) < 1 && acBoth) {
+      /**
+       * AC 트렁크 — 버스 한 줄에 각 유닛이 짧은 탭으로 내려붙는다.
+       *
+       * 심볼끼리 수평으로 곧장 이으면 직렬로 읽힌다. 마이크로인버터는 서로 직렬이 아니라
+       * 같은 분기회로에 **병렬**로 물린 전류원이고, 도체를 따라 전류가 누적되는 것이지
+       * 유닛 출력이 커지는 것이 아니다. 이웃한 탭끼리 버스 구간을 공유하므로
+       * 선분이 이어져 한 줄로 보인다.
+       */
+      const busY = a.y + GEO.trunkBusY;
+      points = [
+        { x: aCx, y: aCy + aHalfH },
+        { x: aCx, y: busY },
+        { x: bCx, y: busY },
+        { x: bCx, y: bCy + bHalfH },
+      ];
+    } else if (Math.abs(aCy - bCy) < 1) {
+      // 같은 행의 DC 직렬 스트링 — 심볼 옆구리끼리 곧장 잇는다. 실제로 직렬이다.
       const forward = a.x <= b.x;
       points = [
         { x: aCx + (forward ? aHalfW : -aHalfW), y: aCy },
@@ -722,6 +768,7 @@ export function layoutGraph(g: RenderGraph): Layout {
 
   return {
     nodes,
+    trunkRefs: [...onTrunk].sort(),
     ports,
     edges: routed,
     drawing: { x: originX, y: originY, w: widest, h: drawingBottom - originY },
