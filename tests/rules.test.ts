@@ -228,6 +228,23 @@ describe("R040 — 모터 기동 LRA", () => {
     expect(codes(run(tesla, site({ largest_motor_lra: 150 })))).toContain("R040.ok");
   });
 
+  it("실효값끼리 비교한다 — 첨두값으로 판정하면 기동 능력을 과대평가한다", () => {
+    // Q.HOME CORE G3는 데이터시트가 실효 44.3A / 첨두 62.7A로 둘을 나눠 적는다.
+    // 그 사이 값(50A)은 실효 기준으로 초과다. 첨두로 비교했다면 통과했을 것이다.
+    const dev = devices.find((d) => d.id === "qcells-qhome-core-g3")!;
+    const rms = dev.ratings.lra!;
+    const peak = dev.ratings.lra_peak_a!;
+    expect(peak).toBeGreaterThan(rms);
+
+    const between = (rms + peak) / 2;
+    const r = run(qcells, site({ largest_motor_lra: between }));
+    expect(find(r, "R040")?.severity).toBe("warning");
+    expect(codes(r)).not.toContain("R040.ok");
+    // 첨두값도 화면에 보이되 판정 근거는 실효값이라는 사실이 문장에 남는다.
+    expect(find(r, "R040")?.message).toContain("실효값");
+    expect(find(r, "R040")?.message).toContain(`${peak}A`);
+  });
+
   it("장비 LRA가 미기재면 성립을 주장하지 않고 경고한다", () => {
     const r = run(enphase, site({ largest_motor_lra: 150 }));
     expect(find(r, "R040.2")?.severity).toBe("warning");

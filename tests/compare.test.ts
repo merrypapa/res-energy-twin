@@ -53,9 +53,14 @@ describe("비교표", () => {
   });
 
   it("값이 없으면 빈칸이 아니라 미확인으로 나온다 — 빈칸은 0으로 읽힌다", () => {
-    // 제품 데이터가 들어오면서 용량·출력은 채워졌다. 아직 확인되지 않은 값(LRA)은 미확인으로 남는다.
+    // 어느 항목이 미확인인지에 매지 않는다 — LRA를 지운 사본으로 본다.
+    const stripped = devices.map((d) =>
+      d.id === "qcells-qhome-core-g3" ? Device.parse({ ...d, ratings: { ...d.ratings, lra: null } }) : d,
+    );
+    expect(cell(compareTopologies(pick("qcells"), stripped, {}), "lra", "Qcells")).toBe(UNKNOWN);
+    // 채워지면 값이 나온다.
     const c = cmp(pick("qcells"));
-    expect(cell(c, "lra", "Qcells")).toBe(UNKNOWN);
+    expect(cell(c, "lra", "Qcells")).not.toBe(UNKNOWN);
     expect(cell(c, "energy", "Qcells")).not.toBe("");
   });
 

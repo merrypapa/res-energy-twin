@@ -6,6 +6,9 @@ import type { RuleFinding } from "../src/schema/rule.js";
  * 모터 기동 — 최대 LRA 부하 vs 장비 LRA 정격.
  *
  * 백업 중 에어컨이 뜨느냐를 가르는 항목이다. 연속 출력이 충분해도 기동 전류에서 걸린다.
+ *
+ * 비교는 실효값끼리 한다. 모터 명판 LRA가 실효값이고 장비 정격도 실효값(ratings.lra)이다.
+ * 첨두값(lra_peak_a)은 더 큰 수라 섞어 쓰면 기동 능력을 과대평가한다 — 참고로만 덧붙인다.
  */
 const rule: Rule = {
   id: "R040",
@@ -30,7 +33,7 @@ const rule: Rule = {
           message:
             `최대 모터 기동 전류(site.largest_motor_lra)가 없어 판정을 할 수 없다. ` +
             (rated.length > 0
-              ? `장비 LRA 정격: ${rated.map((n) => `${n.label} ${n.device.ratings.lra}`).join(", ")}`
+              ? `장비 LRA 정격(실효값): ${rated.map((n) => `${n.label} ${n.device.ratings.lra}A${peak(n)}`).join(", ")}`
               : `장비 LRA 정격도 기재되지 않았다`),
           refs,
         }),
@@ -60,8 +63,8 @@ const rule: Rule = {
           severity: "warning",
           code: "R040",
           message:
-            `모터 기동 ${ctx.site.largest_motor_lra}A 가 ${best.label}의 LRA 정격 ${capacity}A 를 초과한다. ` +
-            `소프트스타터 또는 해당 부하 백업 제외 검토 필요`,
+            `모터 기동 ${ctx.site.largest_motor_lra}A 가 ${best.label}의 LRA 정격 ${capacity}A 를 초과한다 ` +
+            `(둘 다 실효값${peak(best)}). 소프트스타터 또는 해당 부하 백업 제외 검토 필요`,
           refs: [best.ref],
         }),
       ];
@@ -71,11 +74,19 @@ const rule: Rule = {
       finding(rule, {
         severity: "info",
         code: "R040.ok",
-        message: `모터 기동 ${ctx.site.largest_motor_lra}A ≤ ${best.label} LRA ${capacity}A`,
+        message:
+          `모터 기동 ${ctx.site.largest_motor_lra}A ≤ ${best.label} LRA ${capacity}A ` +
+          `(둘 다 실효값${peak(best)})`,
         refs: [best.ref],
       }),
     ];
   },
 };
+
+/** 첨두값이 있으면 괄호 안에 덧붙인다. 판정에는 쓰지 않는다 — 읽는 사람이 두 수를 혼동하지 않게 한다. */
+function peak(n: { device: { ratings: { lra_peak_a: number | null } } }): string {
+  const p = n.device.ratings.lra_peak_a;
+  return p === null ? "" : `, 첨두 ${p}A`;
+}
 
 export default rule;
